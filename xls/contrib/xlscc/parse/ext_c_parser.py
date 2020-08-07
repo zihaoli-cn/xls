@@ -167,6 +167,29 @@ class XLSccParser(CParserBase):
     """function_definition : TEMPLATE LT template_decl_list GT function_definition_base"""
     p[0] = p[5]
 
+  def p_function_definition_base_3(self, p):
+    # Allowed overload operator to be ID because class name not added to typedef till
+    # whole class has been parsed
+    """function_definition : TYPEID OPERATOR overload_declarator declaration_list_opt compound_statement
+    """
+    spec = p[1]  
+    declname = p[1] + '::' + p[3]
+    p[0] = declname
+
+  def p_overload_declarator(self, p):
+    """overload_declarator : operator LPAREN parameter_type_list RPAREN
+    """
+    p[0] = p[1]
+
+  def p_operator(self, p):
+    """ operator : unary_operator
+                 | assignment_operator
+                 | DIVIDE
+                 | PLUSPLUS
+                 | MINUSMINUS
+    """
+    p[0] = p[1]
+
   def p_function_definition_base_2(self, p):
     """function_definition : declaration_specifiers TYPEID DBLCOLON id_declarator declaration_list_opt compound_statement
     """
@@ -174,6 +197,8 @@ class XLSccParser(CParserBase):
     p[4].type.declname = p[2] + p[3] + p[4].type.declname
     p[0] = self._build_function_definition(
         spec=spec, decl=p[4], param_decls=p[5], body=p[6])
+
+
 
   def p_template_val_expression(self, p):
     """template_val_expression   : typedef_name

@@ -111,7 +111,7 @@ class StructType(Type):
       for decl in struct.decls:
         if isinstance(decl, c_ast.FuncDef):
           func = Function()
-          func.parse_function(translator, field)
+          func.parse_function(translator, decl.decl.type)
           func_name = self.name + "::" + func.name
           translator.functions_[func_name] = func
           continue
