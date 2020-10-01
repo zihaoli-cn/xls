@@ -544,7 +544,9 @@ OpClass.kinds['COUNTED_FOR'] = OpClass(
                           expression='operand(0)'),
                    Method(name='invariant_args',
                           return_cpp_type='absl::Span<Node* const>',
-                          expression='operands().subspan(1)')],
+                          expression='operands().subspan(1)'),
+                   Method(name='IsArrayParallelizable', return_cpp_type='bool',
+                          expression=None)],
     custom_clone_method=True
 )
 

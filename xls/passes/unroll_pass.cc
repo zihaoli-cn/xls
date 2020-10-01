@@ -36,8 +36,11 @@ CountedFor* FindCountedFor(Function* f) {
 // Unrolls the node "loop" by replacing it with a sequence of dependent
 // invocations.
 absl::Status UnrollCountedFor(CountedFor* loop, Function* f) {
-  Node* loop_carry = loop->initial_value();
+  Node* loop_carry_in = loop->initial_value();
   int64 ivar_bit_count = loop->body()->params()[0]->BitCountOrDie();
+  bool array_parallel = loop->IsArrayParallelizable();
+  std::vector<Node*> parallel_array_elements;
+
   for (int64 trip = 0, iv = 0; trip < loop->trip_count();
        ++trip, iv += loop->stride()) {
     XLS_ASSIGN_OR_RETURN(
@@ -45,17 +48,31 @@ absl::Status UnrollCountedFor(CountedFor* loop, Function* f) {
         f->MakeNode<Literal>(loop->loc(), Value(UBits(iv, ivar_bit_count))));
 
     // Construct the args for invocation.
-    std::vector<Node*> invoke_args = {iv_node, loop_carry};
+    std::vector<Node*> invoke_args = {iv_node, loop_carry_in};
     for (Node* invariant_arg : loop->invariant_args()) {
       invoke_args.push_back(invariant_arg);
     }
 
     XLS_ASSIGN_OR_RETURN(
-        loop_carry,
+        Node* loop_carry_out,
         f->MakeNode<Invoke>(loop->loc(), absl::MakeSpan(invoke_args),
                             loop->body()));
+
+    if(array_parallel) {
+      XLS_ASSIGN_OR_RETURN(
+          Node* element, f->MakeNode<ArrayIndex>(loop->loc(), loop_carry_out, iv_node));
+      parallel_array_elements.push_back(element);
+    } else {
+      loop_carry_in = loop_carry_out;
+    }
   }
-  XLS_RETURN_IF_ERROR(loop->ReplaceUsesWith(loop_carry).status());
+
+  if(array_parallel) {
+    XLS_ASSIGN_OR_RETURN(Node* result_array, f->MakeNode<Array>(loop->loc(), parallel_array_elements, loop_carry_in->GetType()->AsArrayOrDie()->element_type()));
+    XLS_RETURN_IF_ERROR(loop->ReplaceUsesWith(result_array).status());
+  } else {
+    XLS_RETURN_IF_ERROR(loop->ReplaceUsesWith(loop_carry_in).status());
+  }
   return f->RemoveNode(loop);
 }
 
@@ -70,6 +87,8 @@ absl::StatusOr<bool> UnrollPass::RunOnFunction(Function* f,
     if (loop == nullptr) {
       break;
     }
+    // Recursively unroll loops within loop body.
+    XLS_ASSIGN_OR_RETURN(changed, RunOnFunction(loop->body(), options, results));
     XLS_RETURN_IF_ERROR(UnrollCountedFor(loop, f));
     changed = true;
   }

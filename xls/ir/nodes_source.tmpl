@@ -93,6 +93,58 @@ SliceData Concat::GetOperandSliceData(int64 operandno) const {
   return SliceData{start, this->operand(operandno)->BitCountOrDie()};
 }
 
+bool CountedFor::IsArrayParallelizable() const {
+  Node* index = body()->params().at(0);
+  Node* input_accumulator = body()->params().at(1);
+  Node* return_value = body()->return_value();
+
+  // Accumulator must be an array to parallelize.
+  if(!input_accumulator->GetType()->IsArray()) {
+    return false;
+  }
+
+  // Only parallelize if each loop iteration updates a
+  // single array accumulator index. Note that
+  // if a loop iteration updated multiple indexes,
+  // there would be a chain of ArrayUpdate nodes
+  // such that the returned ArrayUpdate node
+  // would not have the input accumulator as input.
+  if(return_value->op() != Op::kArrayUpdate 
+    || return_value->operands().at(0) != input_accumulator) {
+    return false;
+  }
+
+  // The loop isn't parallelizable if output
+  // from one iteration is consumed in a subsequent 
+  // iteration. We could still parallelize the loop 
+  // if only inititial accumulator values are consumed 
+  // in the loop. However, simply checking if the 
+  // accumulator input has users should be  sufficient 
+  // for most common cases.
+  // Note: One user is allowed - the ArrayUpdate that
+  // writes an index in the output array.
+  if(input_accumulator->users().size() != 1) {
+    return false;
+  }
+  XLS_CHECK(input_accumulator->users().at(0) == return_value);
+
+  // Check that each iteration writes one unique array index.
+  // We cover the common case by simply checking that the
+  // each loop trip (0,1,2,...) writes the corresponding
+  // array index (0,1,2,...). ArrayUpdate index is the 
+  // CountedFor index. If necessary, we could generalize
+  // this to cover other valid cases, such as 
+  // Array[(index + 4) % ArraySize] = ...
+  // In this case, we would probably want to return a mapping
+  // from loop iteration to ArrayUpdate index.
+  if(return_value->operands().at(1) != index || stride() != 1 || trip_count() != input_accumulator->GetType()->AsArrayOrDie()->size()) {
+    return false;
+  }
+
+  
+  return true;
+}
+
 absl::StatusOr<Node*> Send::Clone(absl::Span<Node* const> new_operands,
                                            Function* new_function) const {
   return new_function->MakeNode<Send>(loc(),

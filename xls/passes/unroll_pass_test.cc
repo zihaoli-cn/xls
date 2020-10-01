@@ -18,10 +18,34 @@
 #include "gtest/gtest.h"
 #include "xls/common/status/matchers.h"
 #include "xls/ir/ir_parser.h"
+#include "xls/passes/array_simplification_pass.h"
+#include "xls/passes/bdd_cse_pass.h"
+#include "xls/passes/constant_folding_pass.h"
 #include "xls/passes/dce_pass.h"
+#include "xls/passes/inlining_pass.h"
 
 namespace xls {
 namespace {
+
+class UnrollPassTest: public IrTestBase {
+ protected:
+  absl::StatusOr<bool> Run(Function* f) {
+    PassResults results;
+    XLS_ASSIGN_OR_RETURN(bool changed,
+                         UnrollPass()
+                             .RunOnFunction(f, PassOptions(), &results));
+    XLS_RETURN_IF_ERROR(
+        InliningPass().RunOnFunction(f, PassOptions(), &results).status());
+    XLS_RETURN_IF_ERROR(
+        ArraySimplificationPass().RunOnFunction(f, PassOptions(), &results).status());
+    XLS_RETURN_IF_ERROR(
+        BddCsePass().RunOnFunction(f, PassOptions(), &results).status());
+    XLS_RETURN_IF_ERROR(DeadCodeEliminationPass()
+                            .RunOnFunction(f, PassOptions(), &results)
+                            .status());
+    return changed;
+  }
+};
 
 TEST(UnrollPassTest, UnrollsCountedForWithInvariantArgsAndStride) {
   const std::string program = R"(
