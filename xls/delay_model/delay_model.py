@@ -319,19 +319,33 @@ class LookupEstimator(BoundingBoxEstimator):
 
   def cpp_delay_code(self, node_identifier: Text) -> Text:
     lines = []
-    '''
+
+    # Build lookup map.
+    lines.append('static const std::map<std::vector<int>, int64> lookup_table = {')
     for raw_data_point in self.raw_data_points:
-      test_expr_terms = []
-      for i, x_value in enumerate(raw_data_point[0:-1]):
-        test_expr_terms.append('%s <= %d' % (_delay_factor_cpp_expression(
-            self.delay_factors[i], node_identifier), x_value))
-      lines.append('if (%s) { return %d; }' %
-                   (' && '.join(test_expr_terms), raw_data_point[-1]))
+      lines.append('{{')
+      for factor_value in raw_data_point[0:-1]:
+        lines.append('%d,' % factor_value)
+      lines.append('}, %d},' % raw_data_point[-1])
+    lines.append('};')
+    lines.append('')
+
+    # Build key.
+    lines.append('std::vector<int64> factor_values = {')
+    for factor in self.delay_factors:
+      lines.append('%s,' % _delay_factor_cpp_expression(
+            factor, node_identifier))
+    lines.append('};')
+
+    # Lookup
+    lines.append('if(!lookup_table.contains(factor_values)) {')
     lines.append(
         'return absl::UnimplementedError("Unhandled node for delay estimation: " '
         '+ {}->ToStringWithOperandTypes());'.format(node_identifier))
+    lines.append('}')
+    lines.append('return lookup_table.at(factor_values);')
+
     return '\n'.join(lines)
-    '''
 
   def raw_delay(self, xargs):
     """Returns the delay with delay factors passed in as floats."""

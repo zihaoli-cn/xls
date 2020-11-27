@@ -139,6 +139,95 @@ class DelayModelTest(absltest.TestCase):
               'op: "kBar" bit_count: 65 operands { bit_count: 64 }'))
     self.assertIn('Operation outside bounding box', str(e.exception))
 
+  def test_lookup_estimator(self):
+    data_points_str = [
+        'operation { op: "kBar" bit_count: 3 operands { bit_count: 7 } } ' +
+        'delay: 33 delay_offset: 10',
+        'operation { op: "kBar" bit_count: 12 operands { bit_count: 42 } }' +
+        'delay: 100 delay_offset: 0',
+        'operation { op: "kBar" bit_count: 32 operands { bit_count: 10 } }' +
+        'delay: 123 delay_offset: 1',
+        'operation { op: "kBar" bit_count: 64 operands { bit_count: 64 } }' +
+        'delay: 1234 delay_offset: 0',
+    ]
+    result_bit_count = delay_model_pb2.DelayFactor()
+    result_bit_count.source = delay_model_pb2.DelayFactor.Source.RESULT_BIT_COUNT
+    operand0_bit_count = delay_model_pb2.DelayFactor()
+    operand0_bit_count.source = delay_model_pb2.DelayFactor.Source.OPERAND_BIT_COUNT
+    operand0_bit_count.operand_number = 0
+    bar = delay_model.LookupEstimator(
+        'kBar', (result_bit_count, operand0_bit_count),
+        tuple(_parse_data_point(s) for s in data_points_str))
+    self.assertEqual(
+        bar.operation_delay(
+            _parse_operation(
+                'op: "kBar" bit_count: 3 operands { bit_count: 7 }')), 23)
+    self.assertEqual(
+        bar.operation_delay(
+            _parse_operation(
+                'op: "kBar" bit_count: 12 operands { bit_count: 42 }')), 100)
+    self.assertEqual(
+        bar.operation_delay(
+            _parse_operation(
+                'op: "kBar" bit_count: 32 operands { bit_count: 10 }')), 122)
+    self.assertEqual(
+        bar.operation_delay(
+            _parse_operation(
+                'op: "kBar" bit_count: 64 operands { bit_count: 64 }')), 1234)
+    self.assertEqual(
+        bar.operation_delay(
+            _parse_operation(
+                'op: "kBar" bit_count: 64 operands { bit_count: 64 }')), 1234)
+
+    with self.assertRaises(delay_model.Error) as e:
+      bar.operation_delay(
+          _parse_operation(
+              'op: "kBar" bit_count: 1 operands { bit_count: 1 }'))
+    self.assertIn('Operation not recorded for lookup estimator', str(e.exception))
+
+    with self.assertRaises(delay_model.Error) as e:
+      bar.operation_delay(
+          _parse_operation(
+              'op: "kBar" bit_count: 10 operands { bit_count: 10 }'))
+    self.assertIn('Operation not recorded for lookup estimator', str(e.exception))
+
+    with self.assertRaises(delay_model.Error) as e:
+      bar.operation_delay(
+          _parse_operation(
+              'op: "kBar" bit_count: 65 operands { bit_count: 64 }'))
+    self.assertIn('Operation not recorded for lookup estimator', str(e.exception))
+
+    self.assertEqualIgnoringWhitespace(
+        bar.cpp_delay_code('node'), """
+        static const std::map<std::vector<int>, int64> lookup_table = {
+          {{
+            3,
+            7,
+          }, 23},
+          {{
+            12,
+            42,
+          }, 100},
+          {{
+            32,
+            10,
+          }, 122},
+          {{
+            64,
+            64,
+          }, 1234},
+        };
+
+        std::vector<int64> factor_values = {
+          node->GetType()->GetFlatBitCount(),
+          node->operand(0)->GetType()->GetFlatBitCount(),
+        };
+        if(!lookup_table.contains(factor_values)) {
+          return absl::UnimplementedError("Unhandled node for delay estimation: " + node->ToStringWithOperandTypes());
+        }
+        return lookup_table.at(factor_values);
+        """)
+
   def test_one_factor_regression_estimator(self):
     data_points_str = [
         'operation { op: "kFoo" bit_count: 2 } delay: 210 delay_offset: 10',
