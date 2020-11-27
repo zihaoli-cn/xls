@@ -310,6 +310,38 @@ class BoundingBoxEstimator(Estimator):
     raise Error('Operation outside bounding box')
 
 
+class LookupEstimator(BoundingBoxEstimator):
+  """Lookup estimator."""
+
+  def __init__(self, op, factors: Sequence[delay_model_pb2.DelayFactor],
+               data_points: Sequence[delay_model_pb2.DataPoint]):
+    super(LookupEstimator, self).__init__(op, factors, data_points)
+
+  def cpp_delay_code(self, node_identifier: Text) -> Text:
+    lines = []
+    '''
+    for raw_data_point in self.raw_data_points:
+      test_expr_terms = []
+      for i, x_value in enumerate(raw_data_point[0:-1]):
+        test_expr_terms.append('%s <= %d' % (_delay_factor_cpp_expression(
+            self.delay_factors[i], node_identifier), x_value))
+      lines.append('if (%s) { return %d; }' %
+                   (' && '.join(test_expr_terms), raw_data_point[-1]))
+    lines.append(
+        'return absl::UnimplementedError("Unhandled node for delay estimation: " '
+        '+ {}->ToStringWithOperandTypes());'.format(node_identifier))
+    return '\n'.join(lines)
+    '''
+
+  def raw_delay(self, xargs):
+    """Returns the delay with delay factors passed in as floats."""
+    for raw_data_point in self.raw_data_points:
+      x_values = raw_data_point[0:-1]
+      if all(a == b for (a, b) in zip(xargs, x_values)):
+        return raw_data_point[-1]
+    raise Error('Operation not recorded for lookup estimator')
+
+
 class LogicalEffortEstimator(Estimator):
   """A delay estimator which uses logical effort computation.
 
