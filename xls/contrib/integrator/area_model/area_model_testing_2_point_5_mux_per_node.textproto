@@ -63,6 +63,7 @@ op_models { op: "kSGt" estimator { fixed: 5 } }
 op_models { op: "kSLe" estimator { fixed: 5 } }
 op_models { op: "kSLt" estimator { fixed: 5 } }
 op_models { op: "kSMul" estimator { fixed: 5 } }
+op_models { op: "kSMod" estimator { fixed: 5 } }
 op_models { op: "kShll" estimator { fixed: 5 } }
 op_models { op: "kShra" estimator { fixed: 5 } }
 op_models { op: "kShrl" estimator { fixed: 5 } }
@@ -74,5 +75,6 @@ op_models { op: "kUGt" estimator { fixed: 5 } }
 op_models { op: "kULe" estimator { fixed: 5 } }
 op_models { op: "kULt" estimator { fixed: 5 } }
 op_models { op: "kUMul" estimator { fixed: 5 } }
+op_models { op: "kUMod" estimator { fixed: 5 } }
 op_models { op: "kXor" estimator { fixed: 5 } }
 op_models { op: "kXorReduce" estimator { fixed: 5 } }

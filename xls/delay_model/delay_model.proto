@@ -147,6 +147,12 @@ message BoundingBoxEstimator {
   repeated DelayFactor factors = 1;
 }
 
+// Describes a delay estimation model that consists only of the measured
+// data points. Delays for data points not measured are not supported.
+message LookupEstimator{
+  repeated DelayFactor factors = 1;
+}
+
 // Estimator which uses logical effort computation to approximate
 // delay. Specifically, ops with this estimator are handled by the method
 // DelayEstimator::GetLogicalEffortDelayInPs. Typically only logical operations
@@ -175,8 +181,11 @@ message Estimator {
     // A bounding box model.
     BoundingBoxEstimator bounding_box = 4;
 
+    // A lookup model.
+    LookupEstimator lookup = 5;
+
     // A logical effort estimator.
-    LogicalEffortEstimator logical_effort = 5;
+    LogicalEffortEstimator logical_effort = 6;
   }
 }
 
