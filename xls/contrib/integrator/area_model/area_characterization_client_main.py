@@ -32,6 +32,7 @@ import grpc
 
 from xls.delay_model import delay_model_pb2
 from xls.delay_model import op_module_generator
+from xls.ir.python import bits
 from xls.synthesis import client_credentials
 from xls.synthesis import synthesis_pb2
 from xls.synthesis import synthesis_service_pb2_grpc
@@ -43,8 +44,9 @@ SLE_ALIASES = 'kSLt kSGe kSGt kULe kULt kUGe kNe kEq kNeg kDecode'.split()
 FREE_OPS = ('kArray kArrayConcat kArrayIndex kBitSlice kConcat kIdentity'
             'kLiteral kParam kReverse kTuple kTupleIndex kZeroExt').split()
 
-flat_bit_count_sweep_ceiling=3
-operand_count_sweep_ceiling=4
+flat_bit_count_sweep_ceiling=65
+operand_count_sweep_ceiling=16
+base_loop_stride=2
 
 def _synth(stub: synthesis_service_pb2_grpc.SynthesisServiceStub,
            verilog_text: str,
@@ -133,7 +135,7 @@ def _run_nary_op(
     num_inputs: int) -> List[delay_model_pb2.DataPoint]:
   """Characterizes an nary op"""
   results = []
-  for bit_count in range(1, flat_bit_count_sweep_ceiling):
+  for bit_count in range(1, flat_bit_count_sweep_ceiling, base_loop_stride):
     print('# nary_op: ' + op + ', ' + str(bit_count) + ' bits, ' + str(num_inputs) + ' inputs')
     results.append(_build_data_point(op, kop,  bit_count, [bit_count]*num_inputs, stub))
 
@@ -166,7 +168,8 @@ def _run_nary_op_and_add(
       source=delay_model_pb2.DelayFactor.RESULT_BIT_COUNT)
   add_op_model.estimator.lookup.factors.add(
       source=delay_model_pb2.DelayFactor.OPERAND_COUNT )
-  for input_count in range(1,operand_count_sweep_ceiling):
+
+  for input_count in range(1,operand_count_sweep_ceiling, base_loop_stride):
     model.data_points.extend(_run_nary_op(op, kop, stub, num_inputs=input_count))
 
 def _run_single_bit_result_op_and_add (
@@ -178,7 +181,8 @@ def _run_single_bit_result_op_and_add (
   add_op_model.estimator.lookup.factors.add(
       source = delay_model_pb2.DelayFactor.OPERAND_BIT_COUNT,
       operand_number = 0)
-  for input_bits in range(1, flat_bit_count_sweep_ceiling):
+
+  for input_bits in range(1, flat_bit_count_sweep_ceiling, base_loop_stride):
     print('# reduction_op: ' + op + ', ' + str(input_bits) + ' bits')
     model.data_points.append(_build_data_point(op, kop, 1, [input_bits] * num_inputs, stub))
 
@@ -195,22 +199,21 @@ def _run_comparison_op_and_add(
 def _run_select_op_and_add (
     op: str, kop: str, model: delay_model_pb2.DelayModel,
     stub: synthesis_service_pb2_grpc.SynthesisServiceStub) -> None:
-  """Runs characterization for the given select op"""
+  """Runs characterization for the select op"""
   add_op_model = model.op_models.add(op=kop)
   add_op_model.estimator.lookup.factors.add(
-      source = delay_model_pb2.DelayFactor.OPERAND_BIT_COUNT,
-      operand_number = 1)
+      source=delay_model_pb2.DelayFactor.RESULT_BIT_COUNT)
   add_op_model.estimator.lookup.factors.add(
-      source=delay_model_pb2.DelayFactor.OPERAND_COUNT )
+      source=delay_model_pb2.DelayFactor.OPERAND_COUNT)
 
-  # Enumerate cases.
-  for num_cases in range(2, operand_count_sweep_ceiling):
-    for bit_count in range(1, flat_bit_count_sweep_ceiling):
+  # Enumerate cases and bitwidth.
+  for num_cases in range(2, operand_count_sweep_ceiling, base_loop_stride):
+    for bit_count in range(1, flat_bit_count_sweep_ceiling, base_loop_stride):
       print('# select_op: ' + op + ', ' + str(bit_count) + ' bits, ' + str(num_cases) + ' cases')
       cases_span_attribute = ('cases', 1, num_cases)
 
       # Handle differently if num_cases is a power of 2.
-      select_bits = math.ceil(math.log2(num_cases))
+      select_bits = bits.min_bit_count_unsigned(num_cases-1)
       if math.pow(2, select_bits) == num_cases:
         model.data_points.append(_build_data_point(op, kop, bit_count, [select_bits] + ([bit_count] * num_cases), 
           stub, operand_span_attributes=[cases_span_attribute]))
@@ -219,12 +222,133 @@ def _run_select_op_and_add (
         model.data_points.append(_build_data_point(op, kop, bit_count, [select_bits] + ([bit_count] * (num_cases+1)), 
           stub, operand_span_attributes=[cases_span_attribute], operand_attributes=[default_attribute]))
 
+def _run_one_hot_select_op_and_add (
+    op: str, kop: str, model: delay_model_pb2.DelayModel,
+    stub: synthesis_service_pb2_grpc.SynthesisServiceStub) -> None:
+  """Runs characterization for the one hot select op"""
+  add_op_model = model.op_models.add(op=kop)
+  add_op_model.estimator.lookup.factors.add(
+      source=delay_model_pb2.DelayFactor.RESULT_BIT_COUNT)
+  add_op_model.estimator.lookup.factors.add(
+      source=delay_model_pb2.DelayFactor.OPERAND_COUNT)
+
+  # Enumerate cases and bitwidth.
+  for num_cases in range(2, operand_count_sweep_ceiling, base_loop_stride):
+    for bit_count in range(1, flat_bit_count_sweep_ceiling, base_loop_stride):
+      print('# one_hot_select_op: ' + op + ', ' + str(bit_count) + ' bits, ' + str(num_cases) + ' cases')
+      cases_span_attribute = ('cases', 1, num_cases)
+      select_bits = num_cases
+      model.data_points.append(_build_data_point(op, kop, bit_count, [select_bits] + ([bit_count] * num_cases), 
+        stub, operand_span_attributes=[cases_span_attribute]))
+
+def _run_encode_op_and_add (
+    op: str, kop: str, model: delay_model_pb2.DelayModel,
+    stub: synthesis_service_pb2_grpc.SynthesisServiceStub) -> None:
+  """Runs characterization for the encode op"""
+  add_op_model = model.op_models.add(op=kop)
+  add_op_model.estimator.lookup.factors.add(
+      source = delay_model_pb2.DelayFactor.OPERAND_BIT_COUNT,
+      operand_number = 0)
+
+  for input_bits in range(2, flat_bit_count_sweep_ceiling, base_loop_stride):
+    print('# encode_op: ' + op + ', ' + str(input_bits) + ' input bits')
+    node_bits = bits.min_bit_count_unsigned(input_bits-1)
+    model.data_points.append(_build_data_point(op, kop, node_bits, [input_bits], stub))
+
+def _run_decode_op_and_add (
+    op: str, kop: str, model: delay_model_pb2.DelayModel,
+    stub: synthesis_service_pb2_grpc.SynthesisServiceStub) -> None:
+  """Runs characterization for the decode op"""
+  add_op_model = model.op_models.add(op=kop)
+  add_op_model.estimator.lookup.factors.add(
+      source = delay_model_pb2.DelayFactor.RESULT_BIT_COUNT)
+
+  for node_bits in range(2, flat_bit_count_sweep_ceiling, base_loop_stride):
+    print('# decode_op: ' + op + ', ' + str(node_bits) + ' bits')
+    input_bits = bits.min_bit_count_unsigned(node_bits-1)
+    model.data_points.append(_build_data_point(op, kop, node_bits, [input_bits], stub, 
+      attributes=[('width', str(node_bits))]))
+
+def _run_dynamic_bit_slice_op_and_add(
+    op: str, kop: str, model: delay_model_pb2.DelayModel,
+    stub: synthesis_service_pb2_grpc.SynthesisServiceStub) -> None:
+  """Runs characterization for the dynamic bit slice op"""
+  add_op_model = model.op_models.add(op=kop)
+  # TODO: Expect area = output_width * 2^start_bits
+  add_op_model.estimator.lookup.factors.add(
+      source = delay_model_pb2.DelayFactor.RESULT_BIT_COUNT)
+  add_op_model.estimator.lookup.factors.add(
+      source = delay_model_pb2.DelayFactor.OPERAND_BIT_COUNT,
+      operand_number = 0)
+
+  for start_bits in range(2, bits.min_bit_count_unsigned(flat_bit_count_sweep_ceiling - 1), base_loop_stride**2):
+    input_bits = 2 ** start_bits
+    for node_bits in range(1, input_bits, base_loop_stride**2):
+      print('# encode_op: ' + op + ', ' + str(start_bits) + ' start bits, ' + str(input_bits) 
+          + ' input_bits, ' + str(node_bits) + ' width')
+      model.data_points.append(_build_data_point(op, kop, node_bits, [input_bits, start_bits], stub, 
+        attributes=[('width', str(node_bits))]))
+
+def _run_one_hot_op_and_add(
+    op: str, kop: str, model: delay_model_pb2.DelayModel,
+    stub: synthesis_service_pb2_grpc.SynthesisServiceStub) -> None:
+  """Runs characterization for the one hot slice op"""
+  add_op_model = model.op_models.add(op=kop)
+  add_op_model.estimator.lookup.factors.add(
+      source = delay_model_pb2.DelayFactor.OPERAND_BIT_COUNT,
+      operand_number = 0)
+  for bit_count in range(1, flat_bit_count_sweep_ceiling, base_loop_stride):
+    print('# one_hot: ' + op + ', ' + str(bit_count) + ' input bits')
+    # lsb / msb priority or the same logic but mirror image.
+    model.data_points.append(_build_data_point(op, kop,  bit_count+1, [bit_count], stub,
+      attributes=[('lsb_prio', 'true')]))
+
+def _run_sign_ext_op_and_add(
+    op: str, kop: str, model: delay_model_pb2.DelayModel,
+    stub: synthesis_service_pb2_grpc.SynthesisServiceStub) -> None:
+  """Runs characterization for the sign extend op"""
+  add_op_model = model.op_models.add(op=kop)
+  add_op_model.estimator.lookup.factors.add(
+      source = delay_model_pb2.DelayFactor.RESULT_BIT_COUNT)
+  add_op_model.estimator.lookup.factors.add(
+      source = delay_model_pb2.DelayFactor.OPERAND_BIT_COUNT,
+      operand_number = 0)
+
+  for node_count in range(2, flat_bit_count_sweep_ceiling, base_loop_stride * (2**2)):
+    for input_count in range(1, node_count - 1, base_loop_stride * (2**2)):
+      print('# sign_ext: ' + op + ', ' + str(input_count) + ' input bits, ' + str(node_count) + ' output_bits')
+      model.data_points.append(_build_data_point(op, kop, node_count, [input_count], stub,
+        attributes=[('new_bit_count', str(node_count))]))
+
+
+def  _run_mul_op_and_add(
+    op: str, kop: str, model: delay_model_pb2.DelayModel,
+    stub: synthesis_service_pb2_grpc.SynthesisServiceStub) -> None:
+  """Runs characterization for a mul op"""
+  add_op_model = model.op_models.add(op=kop)
+  add_op_model.estimator.lookup.factors.add(
+      source = delay_model_pb2.DelayFactor.RESULT_BIT_COUNT)
+  add_op_model.estimator.lookup.factors.add(
+      source = delay_model_pb2.DelayFactor.OPERAND_BIT_COUNT,
+      operand_number = 0)
+  add_op_model.estimator.lookup.factors.add(
+      source = delay_model_pb2.DelayFactor.OPERAND_BIT_COUNT,
+      operand_number = 1)
+
+  for mplier_count in range(2, flat_bit_count_sweep_ceiling, base_loop_stride * (2**3)):
+    for mcand_count in range(2, flat_bit_count_sweep_ceiling, base_loop_stride * (2**3)):
+      for node_count in range(2, flat_bit_count_sweep_ceiling, base_loop_stride * (2**3)):
+        print('# mul: ' + op + ', ' + str(mplier_count) + ' * ' + str(mcand_count) + 
+            ' -> ' + str(node_count))
+        model.data_points.append(_build_data_point(op, kop, node_count, [mplier_count, mcand_count], stub))
+
 def run_characterization(
     stub: synthesis_service_pb2_grpc.SynthesisServiceStub) -> None:
   """Runs characterization via 'stub', DelayModel to stdout as prototext."""
   model = delay_model_pb2.DelayModel()
 
   '''
+  # Bin ops
   _run_bin_op_and_add('add', 'kAdd', model, stub)
   _run_bin_op_and_add('sdiv', 'kSDiv', model, stub)
   _run_bin_op_and_add('smod', 'kSMod', model, stub)
@@ -235,18 +359,23 @@ def run_characterization(
   _run_bin_op_and_add('udiv', 'kUDiv', model, stub)
   _run_bin_op_and_add('umod', 'kUMod', model, stub)
 
+  # Unary ops
   _run_unary_op_and_add('neg', 'kNeg', model, stub)
   _run_unary_op_and_add('not', 'kNot', model, stub)
 
+  # Nary ops
   _run_nary_op_and_add('and', 'kAnd', model, stub)
   _run_nary_op_and_add('nand', 'kNAnd', model, stub)
   _run_nary_op_and_add('nor', 'kNor', model, stub)
   _run_nary_op_and_add('or', 'kOr', model, stub)
   _run_nary_op_and_add('xor', 'kXor', model, stub)
 
+  # Reduction ops
   _run_reduction_op_and_add('and_reduce', 'kAndReduce', model, stub)
+  _run_reduction_op_and_add('or_reduce', 'kOrReduce', model, stub)
   _run_reduction_op_and_add('xor_reduce', 'kXorReduce', model, stub)
 
+  # Comparison ops
   _run_comparison_op_and_add('eq', 'kEq', model, stub)
   _run_comparison_op_and_add('ne', 'kNe', model, stub)
   _run_comparison_op_and_add('sge', 'kSGe', model, stub)
@@ -256,25 +385,32 @@ def run_characterization(
   _run_comparison_op_and_add('uge', 'kUGe', model, stub)
   _run_comparison_op_and_add('ugt', 'kUGt', model, stub)
   _run_comparison_op_and_add('ule', 'kULe', model, stub)
-  '''
   _run_comparison_op_and_add('ult', 'kULt', model, stub)
 
+  # Select ops
+  # For functions only called for 1 op, could just encode
+  # op and kOp into function.  However, perfer consistency
+  # and readability of passing them in as args.
   _run_select_op_and_add('sel', 'kSel', model, stub)
-  #_run_select_op_and_add('one_hot_sel', 'kOneHotSel', model, stub)
+  _run_one_hot_select_op_and_add('one_hot_sel', 'kOneHotSel', model, stub)
+  
+  # Encode ops
+  _run_encode_op_and_add('encode', 'kEncode', model, stub)
+  _run_decode_op_and_add('decode', 'kDecode', model, stub)
 
-  '''
-  def add_alias(from_op: str, to_op: str):
-    entry = model.op_models.add(op=from_op)
-    entry.estimator.alias_op = to_op
+  # Dynamic ops
+  _run_dynamic_bit_slice_op_and_add('dynamic_bit_slice', 'kDynamicBitSlice', model, stub)
 
-  add_alias('kSub', to_op='kAdd')
-  add_alias('kShrl', to_op='kShll')
-  add_alias('kShra', to_op='kShll')
-  add_alias('kDynamicBitSlice', to_op='kShll')
-  add_alias('kArrayUpdate', to_op='kArrayIndex')
-  for sle_alias in SLE_ALIASES:
-    add_alias(sle_alias, to_op='kSLe')
+  # One hot op
+  _run_one_hot_op_and_add('one_hot', 'kOneHot', model, stub)
+
+  # Sign extend op
+  _run_sign_ext_op_and_add('sign_ext', 'kSignExt', model, stub)
   '''
+
+  # Mul ops
+  _run_mul_op_and_add('smul', 'kSMul', model, stub)
+  _run_mul_op_and_add('umul', 'kUMul', model, stub)
 
   # Add free ops.
   for free_op in FREE_OPS:
