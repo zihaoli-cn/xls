@@ -31,7 +31,6 @@ cc_binary(
         "//xls/common/file:filesystem",
         "//xls/common/file:get_runfile_path",
         "//xls/common:init_xls",
-        "//xls/common:integral_types",
         "//xls/common/logging",
         "//xls/common/status:status_macros",
         "//xls/third_party/benchmarks/common:data_io",
@@ -45,8 +44,10 @@ cc_binary(
 dslx_test(
     name = "fft",
     srcs = ["fft.x"],
-    deps = ["//xls/modules:fpadd_2x32.x",
+    deps = ["//xls/modules:apfloat_add_2.x",
+            "//xls/modules:fpadd_2x32.x",
             "//xls/modules:fpsub_2x32.x",
+            "//xls/modules:apfloat_mul_2.x",
             "//xls/modules:fpmul_2x32.x",
             "test_data/dslx_test_data.x"],
     # Ir optimization eats up all the memory and bricks my desktop (16 GB of ram).

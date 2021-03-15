@@ -29,7 +29,6 @@ cc_binary(
         "//xls/common/file:filesystem",
         "//xls/common/file:get_runfile_path",
         "//xls/common:init_xls",
-        "//xls/common:integral_types",
         "//xls/common/logging",
         "//xls/common/status:status_macros",
         "//xls/third_party/benchmarks/common:data_io",
@@ -43,7 +42,9 @@ cc_binary(
 dslx_test(
     name = "gemm",
     srcs = ["gemm.x"],
-    deps = ["//xls/modules:fpadd_2x32.x",
+    deps = ["//xls/modules:apfloat_add_2.x",
+            "//xls/modules:fpadd_2x32.x",
+            "//xls/modules:apfloat_mul_2.x",
             "//xls/modules:fpmul_2x32.x",
             "test_data/dslx_test_data.x"],
     # Ir optimization eats up all the memory and bricks my desktop (16 GB of ram).
@@ -53,7 +54,11 @@ dslx_test(
 dslx_test(
     name = "bbgemm_acc_fixed_32_bits_16_by_16_matrix_8_by_8_block",
     srcs = ["bbgemm_acc_fixed_32_bits_16_by_16_matrix_8_by_8_block.x"],
-    deps = ["//xls/modules:fpadd_2x32.x",
+    deps = ["//xls/modules:apfloat_add_2.x",
+            "//xls/modules:fpadd_2x32.x",
+            "//xls/modules:apfloat_mul_2.x",
             "//xls/modules:fpmul_2x32.x",
+            "test_data/dslx_test_data.x",
             "gemm.x"],
+    prove_unopt_eq_opt = False,
 )

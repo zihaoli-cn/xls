@@ -39,7 +39,6 @@
 #include "xls/common/file/filesystem.h"
 #include "xls/common/file/get_runfile_path.h"
 #include "xls/common/init_xls.h"
-#include "xls/common/integral_types.h"
 #include "xls/common/logging/logging.h"
 #include "xls/common/status/status_macros.h"
 #include "xls/third_party/benchmarks/common/data_io.h"
@@ -64,12 +63,12 @@ namespace {
 // not necessary for the input tested.
 
 void gemm(float m1[MATRIX_ELEMENTS], float m2[MATRIX_ELEMENTS], float prod[MATRIX_ELEMENTS]){
-    for(int64 i=0;i<MATRIX_DIM;i++) {
-        for(int64 j=0;j<MATRIX_DIM;j++) {
-            int64 i_col = i * MATRIX_DIM;
+    for(int64_t i=0;i<MATRIX_DIM;i++) {
+        for(int64_t j=0;j<MATRIX_DIM;j++) {
+            int64_t i_col = i * MATRIX_DIM;
             float sum = 0;
-            for(int64 k=0;k<MATRIX_DIM;k++) {
-                int64 k_col = k * MATRIX_DIM;
+            for(int64_t k=0;k<MATRIX_DIM;k++) {
+                int64_t k_col = k * MATRIX_DIM;
                 float mult = m1[i_col + k] * m2[k_col + j];
                 sum += mult;
             }
