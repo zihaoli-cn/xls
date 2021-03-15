@@ -1509,3 +1509,4 @@ int main(int argc, char* argv[]) {
   xls::InitXls(argv[0], argc, argv);
   return RUN_ALL_TESTS();
 }
+
