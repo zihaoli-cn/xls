@@ -59,11 +59,6 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
-        
-        <a href="#build-system" class="md-skip">
-          Skip to content
-        </a>
-      
     </div>
     <div data-md-component="announce">
       
@@ -767,70 +762,10 @@
       <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
       
       
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          Build System
-          <span class="md-nav__icon md-icon"></span>
-        </label>
       
       <a href="./" class="md-nav__link md-nav__link--active">
         Build System
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#rules" class="md-nav__link">
-    Rules
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#bazel-queries" class="md-nav__link">
-    Bazel queries
-  </a>
-  
-    <nav class="md-nav" aria-label="Bazel queries">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#finding-transitive-dependencies" class="md-nav__link">
-    Finding transitive dependencies
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#finding-dependees-reverse-dependencies" class="md-nav__link">
-    Finding dependees ("reverse dependencies")
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
       
     </li>
   
@@ -1161,66 +1096,6 @@
               </div>
             
             
-              
-              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
-                <div class="md-sidebar__scrollwrap">
-                  <div class="md-sidebar__inner">
-                    
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#rules" class="md-nav__link">
-    Rules
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#bazel-queries" class="md-nav__link">
-    Bazel queries
-  </a>
-  
-    <nav class="md-nav" aria-label="Bazel queries">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#finding-transitive-dependencies" class="md-nav__link">
-    Finding transitive dependencies
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#finding-dependees-reverse-dependencies" class="md-nav__link">
-    Finding dependees ("reverse dependencies")
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-                  </div>
-                </div>
-              </div>
-            
           
           <div class="md-content" data-md-component="content">
             <article class="md-content__inner md-typeset">
@@ -1231,68 +1106,9 @@
 </a>
 
 
-<h1 id="build-system">Build system</h1>
-<p>XLS uses the <a href="http://bazel.build">Bazel</a> build system for itself and all its
-dependencies. Bazel is an easy to configure and use, and has powerful extension
-facilities. (It's also
-<a href="https://docs.bazel.build/versions/master/bazel-overview.html">well-documented</a>!)
-XLS provides a number of
-<a href="https://docs.bazel.build/versions/master/skylark/language.html">Starlark</a>
-<a href="https://docs.bazel.build/versions/master/skylark/rules.html">rules</a> and
-<a href="https://docs.bazel.build/versions/master/skylark/macros.html">macros</a> to define
-a build flow.</p>
-<div class="toc">
-<ul>
-<li><a href="#build-system">Build system</a><ul>
-<li><a href="#rules">Rules</a></li>
-<li><a href="#bazel-queries">Bazel queries</a><ul>
-<li><a href="#finding-transitive-dependencies">Finding transitive dependencies</a></li>
-<li><a href="#finding-dependees-reverse-dependencies">Finding dependees ("reverse dependencies")</a></li>
-</ul>
-</li>
-</ul>
-</li>
-</ul>
-</div>
-<h2 id="rules">Rules</h2>
-<p>XLS build rules and macros are defined in
-<a href="https://github.com/google/xls/tree/main/xls/build_rules/xls_build_defs.bzl">xls/build_rules/xls_build_defs.bzl</a>.</p>
-<p>Examples using the rules and macros are found at
-<a href="https://github.com/google/xls/tree/main/xls/build_rules/tests/BUILD">xls/build_rules/tests/BUILD</a>.</p>
-<p>A detailed description of the bazel rules/macros can be found
-<a href="../bazel_rules_macros/">here</a>.</p>
-<h2 id="bazel-queries">Bazel queries</h2>
-<p>Understanding the build tree for a new project can be difficult, but fortunately
-Bazel provides a
-<a href="https://docs.bazel.build/versions/master/query.html">powerful query mechanism</a>.
-<code>bazel query</code> enables a user to examine build targets, dependencies between
-them, and much more. A few usage examples are provided here, but the full
-documentation (linked above) is comprehensive.</p>
-<h3 id="finding-transitive-dependencies">Finding transitive dependencies</h3>
-<p>To understand why, for example, the combinational verilog generator depends on
-the ABSL container algorithm library, one could run:</p>
-<div class="highlight"><pre><span></span><code>$ bazel query &#39;somepath(//xls/codegen:combinational_generator, @com_google_absl//absl/algorithm:container)&#39;
-//xls/codegen:combinational_generator
-//xls/codegen:vast
-@com_google_absl//absl/algorithm:container
-</code></pre></div>
-<p>This result shows that one such path goes through the <code>:vast</code> target. Another
-such path goes through the xls/ir:ir target, then the xls/ir:value target.
-<code>somepath</code> provides <em>some</em> path, not all paths (that's what <code>allpaths</code> is for).</p>
-<h3 id="finding-dependees-reverse-dependencies">Finding dependees ("reverse dependencies")</h3>
-<p>Sometimes it's useful to identify the set of targets depending on some other
-target - the <code>rdeps</code> query performs this:</p>
-<div class="highlight"><pre><span></span><code>$ bazel query &#39;rdeps(//xls/codegen:all, //xls/codegen:combinational_generator)&#39;
-//xls/codegen:flattening_test
-//xls/ir:ir_test_base
-//xls/codegen:combinational_generator_test
-//xls/codegen:combinational_generator
-</code></pre></div>
-<p>This shows the transitive closure of all dependencies of the combinational
-generator, with the starting set being all targets in <code>//xls/codegen:all</code>. This
-set of dependees can quickly grow to be unmanageable, so keep the initial set
-(the first argument) as small as possible, and consider specifying a third
-argument for maximum search depth.</p>
+  <h1>Build System</h1>
+
+<p>Sun Feb  6 03:56:25 UTC 2022</p>
 
               
             </article>
