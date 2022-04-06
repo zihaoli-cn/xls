@@ -54,4 +54,6 @@ jobs:
           echo "~/opt/bin/" >> ${GITHUB_PATH}
       - name: Bazel Test Target (opt)
         run: |
-          "${GITHUB_WORKSPACE}/bin/bazel" test -c opt --test_output=all --runs_per_test=$BAZEL_RUNS_PER_TEST --test_arg=--logtostderr --test_arg=--v=3 -- $BAZEL_TARGET  -//xls/contrib/xlscc/...
+          echo "$GITHUB_PATH"
+          echo "$pythonLocation"
+          "${GITHUB_WORKSPACE}/bin/bazel" test -c opt  --action_env="PYTHON_BIN_PATH=$pythonLocation" --test_output=all --runs_per_test=$BAZEL_RUNS_PER_TEST --test_arg=--logtostderr --test_arg=--v=3 -- $BAZEL_TARGET  -//xls/contrib/xlscc/...

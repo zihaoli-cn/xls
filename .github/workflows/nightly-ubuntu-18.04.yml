@@ -45,4 +45,6 @@ jobs:
       # over 6 hours of build time.
       - name: Bazel Test All (opt)
         run: |
-          "${GITHUB_WORKSPACE}/bin/bazel" test -c opt -- //xls/... -//xls/contrib/xlscc/...
+          echo "$GITHUB_PATH"
+          echo "$pythonLocation"
+          "${GITHUB_WORKSPACE}/bin/bazel" test -c opt  --action_env="PYTHON_BIN_PATH=$pythonLocation" -- //xls/... -//xls/contrib/xlscc/...
