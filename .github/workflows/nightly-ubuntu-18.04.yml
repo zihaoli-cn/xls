@@ -21,7 +21,7 @@ jobs:
       - uses: actions/cache@v3
         with:                                                                   
           path: "~/.cache/bazel"
-          key: cache-nightly-18_04-${{ github.action }}
+          key: cache-nightly-18_04
       - name: Install bazelisk
         run: |
           curl -LO "https://github.com/bazelbuild/bazelisk/releases/download/v1.1.0/bazelisk-linux-amd64"
