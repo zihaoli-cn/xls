@@ -49,7 +49,4 @@ jobs:
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 10
       - name: Bazel Test Target (opt)
         run: |
-          echo "$GITHUB_PATH"
-          echo "$pythonLocation"
-          echo "$(which python3)"
           "${GITHUB_WORKSPACE}/bin/bazel" test -c opt  --action_env="PYTHON_BIN_PATH=$(which python3)" --test_output=all --runs_per_test=$BAZEL_RUNS_PER_TEST --test_arg=--logtostderr --test_arg=--v=3 -- $BAZEL_TARGET  -//xls/contrib/xlscc/...
