@@ -47,4 +47,5 @@ jobs:
         run: |
           echo "$GITHUB_PATH"
           echo "$pythonLocation"
-          "${GITHUB_WORKSPACE}/bin/bazel" test -c opt  --action_env="PYTHON_BIN_PATH=$pythonLocation" -- //xls/... -//xls/contrib/xlscc/...
+          echo "$(which python3)"
+          "${GITHUB_WORKSPACE}/bin/bazel" test -c opt  --action_env="PYTHON_BIN_PATH=$pythonLocation/python3" -- //xls/... -//xls/contrib/xlscc/...

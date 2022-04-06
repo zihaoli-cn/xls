@@ -8,7 +8,7 @@ on:
     inputs:
       target:
         description: 'Bazel Target Pattern'
-        default: '//xls/dslx:interpreter_test'
+        default: '//xls/dslx/interpreter:interpreter_test'
         required: true
       runs_per_test:
         description: 'Number of Runs'
@@ -56,4 +56,5 @@ jobs:
         run: |
           echo "$GITHUB_PATH"
           echo "$pythonLocation"
-          "${GITHUB_WORKSPACE}/bin/bazel" test -c opt  --action_env="PYTHON_BIN_PATH=$pythonLocation" --test_output=all --runs_per_test=$BAZEL_RUNS_PER_TEST --test_arg=--logtostderr --test_arg=--v=3 -- $BAZEL_TARGET  -//xls/contrib/xlscc/...
+          echo "$(which python3)
+          "${GITHUB_WORKSPACE}/bin/bazel" test -c opt  --action_env="PYTHON_BIN_PATH=$pythonLocation/python3" --test_output=all --runs_per_test=$BAZEL_RUNS_PER_TEST --test_arg=--logtostderr --test_arg=--v=3 -- $BAZEL_TARGET  -//xls/contrib/xlscc/...
