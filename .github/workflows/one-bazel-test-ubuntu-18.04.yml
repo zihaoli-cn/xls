@@ -47,6 +47,11 @@ jobs:
           sudo apt-get install -y gcc-10 g++-10
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 10
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 10
+      - name: Put Python binary in PATH for Bazel Python env
+        run: |
+          mkdir -p ~/opt/bin
+          ln -s $(which python3) ~/opt/bin/python
+          echo "~/opt/bin/" >> ${GITHUB_PATH}
       - name: Bazel Test Target (opt)
         run: |
           "${GITHUB_WORKSPACE}/bin/bazel" test -c opt --test_output=all --runs_per_test=$BAZEL_RUNS_PER_TEST --test_arg=--logtostderr --test_arg=--v=3 -- $BAZEL_TARGET  -//xls/contrib/xlscc/...
