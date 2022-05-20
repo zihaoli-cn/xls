@@ -175,3 +175,28 @@ cc_library(
         "//xls/ir",
     ],
 )
+
+cc_binary(
+    name = "benchmark",
+    srcs = ["benchmark.cc"],
+    visibility = ["//xls:xls_users"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
+        "@com_google_absl//absl/time",
+        "//xls/common:init_xls",
+        "//xls/common:math_util",
+        "//xls/common/file:filesystem",
+        "//xls/common/logging",
+        "//xls/common/status:status_macros",
+        "//xls/delay_model:analyze_critical_path",
+        "//xls/delay_model:delay_estimator",
+        "//xls/delay_model:delay_estimators",
+        "//xls/ir",
+        "//xls/ir:ir_parser",
+        ":pipeline_schedule",
+        "//xls/examples:schedule_benchmark_packages"
+    ],
+)
