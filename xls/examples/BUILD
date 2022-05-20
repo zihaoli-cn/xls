@@ -395,3 +395,57 @@ synthesize_rtl(
 #     synthesized_rtl = ":find_index_5000ps_model_unit_verilog_synth",
 #     target_die_utilization_percentage = "30",
 # )
+
+
+filegroup(
+    name = "scheduling_examples",
+    srcs = [
+        "//xls/examples/jpeg:idct_chen.opt.ir",
+        "//xls/examples/dslx_intro:crc32_one_byte_inferred.opt.ir",
+        "//xls/examples/dslx_intro:crc32_one_byte.opt.ir",
+        ":crc32.opt.ir",
+        ":hack_cpu.opt.ir",
+        ":riscv_simple.opt.ir",
+        ":sha256.opt.ir",
+    ],
+)
+
+list_filegroup_files(
+    name = "scheduling_examples_file_list",
+    src = ":scheduling_examples",
+    out = "scheduling_examples_file_list.txt",
+)
+
+cc_library(
+    name = "schedule_benchmark_packages",
+    srcs = [
+        "schedule_benchmark_packages.cc",
+        "schedule_benchmark_packages.inc.h",
+    ],
+    hdrs = ["schedule_benchmark_packages.h"],
+    data = [
+        ":scheduling_examples_file_list.txt",
+        ":scheduling_examples",
+    ],
+    deps = [
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "//xls/common/file:filesystem",
+        "//xls/common/file:get_runfile_path",
+        "//xls/common/file:path",
+        "//xls/common/logging",
+        "//xls/common/status:status_macros",
+        "//xls/ir",
+        "//xls/ir:function_builder",
+        "//xls/ir:ir_parser",
+    ],
+)
+
+xls_dslx_opt_ir(
+    name = "hack_cpu",
+    srcs = ["hack_cpu.x"],
+    dslx_top = "cpu",
+    ir_file = "hack_cpu.ir",
+    opt_ir_file = "hack_cpu.opt.ir",
+)
