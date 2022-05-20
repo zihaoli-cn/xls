@@ -225,7 +225,6 @@ absl::StatusOr<ScheduleCycleMap> ScheduleToMinimizeRegistersSDC(
   // a dummy node to represent an artificial sink node on the data-dependence graph
   or_tools::ColIndex cycle_at_sinknode = lp.CreateNewVariable();
 
-  Function* as_func = dynamic_cast<Function*>(f);
   for (Node* node : f->nodes()) {
     or_tools::ColIndex lifetime_at_node = lifetime_var[node];
     or_tools::ColIndex cycle_at_node = cycle_var[node];

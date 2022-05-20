@@ -19,8 +19,10 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "xls/common/status/matchers.h"
+#include "xls/delay_model/analyze_critical_path.h"
 #include "xls/delay_model/delay_estimator.h"
 #include "xls/delay_model/delay_estimators.h"
+#include "xls/examples/sample_packages.h"
 #include "xls/ir/bits.h"
 #include "xls/ir/function_builder.h"
 #include "xls/ir/ir_matcher.h"
@@ -798,6 +800,44 @@ TEST_F(PipelineScheduleTest, ProcScheduleWithInputDelay) {
       // receive.3: (token, bits[16]) = receive(tkn, channel_id=0, id=3)
       // st: () = param(st, id=2)
       EXPECT_EQ(updated_nodes_in_first_cycle, 3);
+    }
+  }
+}
+
+TEST_F(PipelineScheduleTest, BenchmarkTest) {
+  // Compute the correctness of SDC
+  XLS_ASSERT_OK_AND_ASSIGN(std::vector<std::string> benchmark_names,
+                           sample_packages::GetBenchmarkNames());
+  for (const std::string& benchmark_name : benchmark_names) {
+    XLS_ASSERT_OK_AND_ASSIGN(
+        std::unique_ptr<Package> p,
+        sample_packages::GetBenchmark(benchmark_name, /*optimized=*/true));
+
+    absl::StatusOr<Function*> f_status = p->GetTopAsFunction();
+    if (!f_status.ok()) {
+      // Skip packages which need the entry to be specified explicitly.
+      continue;
+    }
+    Function * f = f_status.value();
+
+    XLS_ASSERT_OK_AND_ASSIGN(std::vector<CriticalPathEntry> critical_path, AnalyzeCriticalPath(f, absl::nullopt, TestDelayEstimator()));
+    int64_t max_delay = critical_path.front().path_delay_ps;
+
+    for(int64_t clk = 3; clk <= std::min((int64_t)30, max_delay/2 - 1); ++clk){
+      SchedulingOptions sdc_exact_options(SchedulingStrategy::MINIMIZE_REGISTERS_SDC);
+      SchedulingOptions cut_options(SchedulingStrategy::MINIMIZE_REGISTERS);
+      cut_options.clock_period_ps(clk);
+      sdc_exact_options.clock_period_ps(clk);
+
+      XLS_ASSERT_OK_AND_ASSIGN(
+          PipelineSchedule sdc_exact_schedule,
+          PipelineSchedule::Run(f, TestDelayEstimator(), sdc_exact_options));
+      XLS_EXPECT_OK(sdc_exact_schedule.Verify());
+      XLS_EXPECT_OK(sdc_exact_schedule.VerifyTiming(clk, TestDelayEstimator()));
+
+      XLS_ASSERT_OK_AND_ASSIGN(
+          PipelineSchedule cut_schedule,
+          PipelineSchedule::Run(f, TestDelayEstimator(), cut_options));
     }
   }
 }
