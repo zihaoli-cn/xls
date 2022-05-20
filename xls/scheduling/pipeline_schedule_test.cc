@@ -823,7 +823,7 @@ TEST_F(PipelineScheduleTest, BenchmarkTest) {
     XLS_ASSERT_OK_AND_ASSIGN(std::vector<CriticalPathEntry> critical_path, AnalyzeCriticalPath(f, absl::nullopt, TestDelayEstimator()));
     int64_t max_delay = critical_path.front().path_delay_ps;
 
-    for(int64_t clk = 3; clk <= std::min((int64_t)30, max_delay/2 - 1); ++clk){
+    for(int64_t clk = 3; clk <= std::min((int64_t)10, max_delay/2 - 1); ++clk) {
       SchedulingOptions sdc_exact_options(SchedulingStrategy::MINIMIZE_REGISTERS_SDC);
       SchedulingOptions cut_options(SchedulingStrategy::MINIMIZE_REGISTERS);
       cut_options.clock_period_ps(clk);

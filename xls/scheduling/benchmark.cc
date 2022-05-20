@@ -103,9 +103,9 @@ absl::Status RealMain() {
     int64_t max_delay = critical_path.front().path_delay_ps;
     
     std::vector<std::string> data_points;
-    std::vector<double> boost_ratio;
-    //int64_t clk_min = std::max((int64_t)3, max_delay/4 - 1);
-    //int64_t clk_max = std::min((int64_t)clk_min + 8, max_delay/2);
+    std::vector<double> boost_ratios;
+    std::vector<int64_t> reduced_register_widths;
+
     int64_t clk_min = 3;
     int64_t clk_max = max_delay/2;
     for(int64_t clk = clk_min;
@@ -135,21 +135,24 @@ absl::Status RealMain() {
       int64_t result_cut = cut_schedule.CountFinalInteriorPipelineRegisters();
       XLS_CHECK_LE(result_sdc, result_cut);
 
-      double boost = (result_cut - result_sdc)/(double)result_sdc;
+      int64_t reduced_register_width = result_cut - result_sdc;
+      double boost = (double)reduced_register_width/(double)result_sdc;
       
-      boost_ratio.push_back(boost);
-      data_points.push_back(absl::StrFormat("{\"clk\":%lld, \"time_sdc\":%lf, \"time_cut\":%lf, \"result_sdc\":%lld, \"result_cut\":%lld, \"boost\":%lf}", 
-                       clk, sdc_work_time, cut_work_time, result_sdc, result_cut, boost));
+      boost_ratios.push_back(boost);
+      reduced_register_widths.push_back(reduced_register_width);
+      data_points.push_back(absl::StrFormat("{\"clk\":%lld, \"time_sdc\":%lf, \"time_cut\":%lf, \"result_sdc\":%lld, \"result_cut\":%lld, \"reduced_bits\":%lld, \"boost\":%lf}", 
+                       clk, sdc_work_time, cut_work_time, result_sdc, result_cut, reduced_register_width, boost));
     
       std::cerr << benchmark_name << ":\n\t" 
                 << data_points.back() << std::endl;
     }
-    double average_boost_ratio = std::accumulate(boost_ratio.begin(), boost_ratio.end(), 0.0) / (double) boost_ratio.size();
+    double avg_ratio = std::accumulate(boost_ratios.begin(), boost_ratios.end(), 0.0) / (double) boost_ratios.size();
+    int64_t avg_reduced_width = std::accumulate(reduced_register_widths.begin(), reduced_register_widths.end(), (int64_t)0) / reduced_register_widths.size();
     int64_t edge_count = std::accumulate(f->nodes().begin(), f->nodes().end(), (int64_t)0, [](int64_t acc, Node* node){
         return acc + node->users().size();
     });
 
-    sample_results.push_back(absl::StrFormat("{\"name\":%s, \"max_delay\":%lld, \"node_count\":%lld, \"edge_count\":%lld, \"avg_boost\":%lf, \"data\" : [%s]}", benchmark_name, max_delay, f->node_count(), edge_count, average_boost_ratio, absl::StrJoin(data_points, ",")));
+    sample_results.push_back(absl::StrFormat("{\"name\":\"%s\", \"max_delay\":%lld, \"node_count\":%lld, \"edge_count\":%lld, \"avg_boost\":%lf, \"avg_reduced_width\":%lld, \"data\" : [%s]}", benchmark_name, max_delay, f->node_count(), edge_count, avg_ratio, avg_reduced_width, absl::StrJoin(data_points, ",")));
 
     std::cerr << "====\n" << sample_results.back() << "\n====\n" << std::endl;
   }
