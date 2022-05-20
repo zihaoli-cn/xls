@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+//#define ENABLE_LOG_TO_CERR
 #include <numeric>
 #include <iostream>
 #include <ctime>
@@ -140,11 +140,13 @@ absl::Status RealMain() {
       
       boost_ratios.push_back(boost);
       reduced_register_widths.push_back(reduced_register_width);
-      data_points.push_back(absl::StrFormat("{\"clk\":%lld, \"time_sdc\":%lf, \"time_cut\":%lf, \"result_sdc\":%lld, \"result_cut\":%lld, \"reduced_bits\":%lld, \"boost\":%lf}", 
+      data_points.push_back(absl::StrFormat("{\"clk\":%lld, \"time_sdc\":%.4e, \"time_cut\":%.4e, \"result_sdc\":%lld, \"result_cut\":%lld, \"reduced_bits\":%lld, \"boost\":%.4e}", 
                        clk, sdc_work_time, cut_work_time, result_sdc, result_cut, reduced_register_width, boost));
-    
+
+#ifdef ENABLE_LOG_TO_CERR
       std::cerr << benchmark_name << ":\n\t" 
                 << data_points.back() << std::endl;
+#endif
     }
     double avg_ratio = std::accumulate(boost_ratios.begin(), boost_ratios.end(), 0.0) / (double) boost_ratios.size();
     int64_t avg_reduced_width = std::accumulate(reduced_register_widths.begin(), reduced_register_widths.end(), (int64_t)0) / reduced_register_widths.size();
@@ -152,9 +154,11 @@ absl::Status RealMain() {
         return acc + node->users().size();
     });
 
-    sample_results.push_back(absl::StrFormat("{\"name\":\"%s\", \"max_delay\":%lld, \"node_count\":%lld, \"edge_count\":%lld, \"avg_boost\":%lf, \"avg_reduced_width\":%lld, \"data\" : [%s]}", benchmark_name, max_delay, f->node_count(), edge_count, avg_ratio, avg_reduced_width, absl::StrJoin(data_points, ",")));
+    sample_results.push_back(absl::StrFormat("{\"name\":\"%s\", \"max_delay\":%lld, \"node_count\":%lld, \"edge_count\":%lld, \"avg_boost\":%.4e, \"avg_reduced_width\":%lld, \"data\" : [%s]}", benchmark_name, max_delay, f->node_count(), edge_count, avg_ratio, avg_reduced_width, absl::StrJoin(data_points, ",")));
 
+#ifdef ENABLE_LOG_TO_CERR
     std::cerr << "====\n" << sample_results.back() << "\n====\n" << std::endl;
+#endif
   }
 
   std::cout << absl::StrFormat("[%s]", absl::StrJoin(sample_results, ",")) << std::endl;

@@ -11,7 +11,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+//#define LOG_SDC_INTERNAL_RUNNING_TIME_TO_CERR
+#ifdef LOG_SDC_INTERNAL_RUNNING_TIME_TO_CERR
+#include <iostream>
+#include <ctime>
+#endif
 #include <algorithm>
 #include <cmath>
 #include <functional>
@@ -252,6 +256,9 @@ absl::StatusOr<ScheduleCycleMap> ScheduleToMinimizeRegistersSDC(
     }
   }
 
+#ifdef LOG_SDC_INTERNAL_RUNNING_TIME_TO_CERR
+  clock_t t = clock();
+#endif
   XLS_ASSIGN_OR_RETURN(auto delay_map, ComputeNodeDelays(f, delay_estimator));
   for (Node* src : f->nodes()){
     for (Node* dst : SearchPathsJustExceedClockPeriod(src, clock_period_ps, delay_map)){
@@ -262,6 +269,9 @@ absl::StatusOr<ScheduleCycleMap> ScheduleToMinimizeRegistersSDC(
       lp.SetCoefficient(constraint, cycle_var[src], -1);
     }
   }
+#ifdef LOG_SDC_INTERNAL_RUNNING_TIME_TO_CERR
+  std::cerr << absl::StrFormat("%.4e", (clock() - t) / double(CLOCKS_PER_SEC)) << ",";
+#endif
 
   for (Node* node : f->nodes()) {
     lp.SetObjectiveCoefficient(lifetime_var[node],
@@ -275,7 +285,14 @@ absl::StatusOr<ScheduleCycleMap> ScheduleToMinimizeRegistersSDC(
   parameters.set_provide_strong_optimal_guarantee(true);
   solver.SetParameters(parameters);
 
+#ifdef LOG_SDC_INTERNAL_RUNNING_TIME_TO_CERR
+  t = clock();
+#endif
   or_tools::ProblemStatus status = solver.Solve(lp);
+#ifdef LOG_SDC_INTERNAL_RUNNING_TIME_TO_CERR
+  std::cerr << absl::StrFormat("%.4e", (clock() - t) / double(CLOCKS_PER_SEC)) << std::endl;
+#endif
+
   // Check that the problem has an optimal solution.
   if (status != or_tools::ProblemStatus::OPTIMAL) {
     return absl::InternalError(
