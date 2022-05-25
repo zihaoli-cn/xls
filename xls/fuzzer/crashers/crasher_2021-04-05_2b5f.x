@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Exception:
-// Command '['/xls/tools/eval_ir_main', '--input_file=args.txt', '--use_llvm_jit', 'sample.ir', '--logtostderr']' died with <Signals.SIGBUS: 7>.
+// Command '['/xls/tools/eval_ir_main', '--input_file=args.txt', '--use_llvm_jit', 'sample.ir', '--xls_logtostderr']' died with <Signals.SIGBUS: 7>.
 // Issue: https://github.com/google/xls/issues/373
 //
 // options: {"codegen": true, "codegen_args": ["--use_system_verilog", "--generator=pipeline", "--pipeline_stages=1"], "convert_to_ir": true, "input_is_dslx": true, "ir_converter_args": ["--top=main"], "optimize_ir": true, "simulate": false, "simulator": null, "use_jit": true, "use_system_verilog": true}

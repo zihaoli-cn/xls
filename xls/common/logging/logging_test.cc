@@ -44,7 +44,7 @@ using ::xls::status_testing::IsOkAndHolds;
 class LoggingTest : public ::xls::logging_internal::testing::LoggingTestBase {
  public:
   LoggingTest() {
-    absl::SetFlag(&FLAGS_v, 10);  // Enable verbose logging
+    absl::SetFlag(&FLAGS_xls_v, 10);  // Enable verbose logging
   }
 };
 

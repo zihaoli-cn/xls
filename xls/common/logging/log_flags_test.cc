@@ -53,7 +53,7 @@ class LogFlagsTest : public ::xls::logging_internal::testing::LoggingTestBase {
 
 TEST_F(LogFlagsTest, MinloglevelSuppressesLoggingBelowSpecifiedLevel) {
   auto set_flag = ScopedFlagSetter(
-      &FLAGS_minloglevel, static_cast<int>(absl::LogSeverity::kWarning));
+      &FLAGS_xls_minloglevel, static_cast<int>(absl::LogSeverity::kWarning));
   XLS_LOG(INFO) << "test_msg";
 
   EXPECT_THAT(entries_, IsEmpty());
@@ -61,7 +61,7 @@ TEST_F(LogFlagsTest, MinloglevelSuppressesLoggingBelowSpecifiedLevel) {
 
 TEST_F(LogFlagsTest, MinloglevelAllowsLoggingAtSpecifiedLevel) {
   auto set_flag = ScopedFlagSetter(
-      &FLAGS_minloglevel, static_cast<int>(absl::LogSeverity::kWarning));
+      &FLAGS_xls_minloglevel, static_cast<int>(absl::LogSeverity::kWarning));
 
   XLS_LOG(WARNING) << "test_msg";
 
@@ -71,7 +71,7 @@ TEST_F(LogFlagsTest, MinloglevelAllowsLoggingAtSpecifiedLevel) {
 
 TEST_F(LogFlagsTest, MinloglevelAllowsLoggingAboveSpecifiedLevel) {
   auto set_flag = ScopedFlagSetter(
-      &FLAGS_minloglevel, static_cast<int>(absl::LogSeverity::kWarning));
+      &FLAGS_xls_minloglevel, static_cast<int>(absl::LogSeverity::kWarning));
 
   XLS_LOG(ERROR) << "test_msg";
 
@@ -80,8 +80,8 @@ TEST_F(LogFlagsTest, MinloglevelAllowsLoggingAboveSpecifiedLevel) {
 }
 
 TEST_F(LogFlagsTest, LogToStderrFalseDoesNotCauseInfoLoggingToStderr) {
-  auto set_logtostderr = ScopedFlagSetter(&FLAGS_logtostderr, false);
-  auto set_alsologtostderr = ScopedFlagSetter(&FLAGS_alsologtostderr, false);
+  auto set_logtostderr = ScopedFlagSetter(&FLAGS_xls_logtostderr, false);
+  auto set_alsologtostderr = ScopedFlagSetter(&FLAGS_xls_alsologtostderr, false);
 
   absl::StatusOr<std::string> output = ::xls::testing::CaptureStream(
       STDERR_FILENO, [] { XLS_LOG(INFO) << "test_info_log_message"; });
@@ -90,8 +90,8 @@ TEST_F(LogFlagsTest, LogToStderrFalseDoesNotCauseInfoLoggingToStderr) {
 }
 
 TEST_F(LogFlagsTest, LogToStderrTrueCausesInfoLoggingToStderr) {
-  auto set_logtostderr = ScopedFlagSetter(&FLAGS_logtostderr, true);
-  auto set_alsologtostderr = ScopedFlagSetter(&FLAGS_alsologtostderr, false);
+  auto set_logtostderr = ScopedFlagSetter(&FLAGS_xls_logtostderr, true);
+  auto set_alsologtostderr = ScopedFlagSetter(&FLAGS_xls_alsologtostderr, false);
 
   absl::StatusOr<std::string> output = ::xls::testing::CaptureStream(
       STDERR_FILENO, [] { XLS_LOG(INFO) << "test_info_log_message"; });
@@ -100,8 +100,8 @@ TEST_F(LogFlagsTest, LogToStderrTrueCausesInfoLoggingToStderr) {
 }
 
 TEST_F(LogFlagsTest, AlsoLogToStderrTrueCausesInfoLoggingToStderr) {
-  auto set_logtostderr = ScopedFlagSetter(&FLAGS_logtostderr, false);
-  auto set_alsologtostderr = ScopedFlagSetter(&FLAGS_alsologtostderr, true);
+  auto set_logtostderr = ScopedFlagSetter(&FLAGS_xls_logtostderr, false);
+  auto set_alsologtostderr = ScopedFlagSetter(&FLAGS_xls_alsologtostderr, true);
 
   absl::StatusOr<std::string> output = ::xls::testing::CaptureStream(
       STDERR_FILENO, [] { XLS_LOG(INFO) << "test_info_log_message"; });
@@ -110,10 +110,10 @@ TEST_F(LogFlagsTest, AlsoLogToStderrTrueCausesInfoLoggingToStderr) {
 }
 
 TEST_F(LogFlagsTest, StderrThresholdSuppressesLoggingBelowSpecifiedLevel) {
-  auto set_logtostderr = ScopedFlagSetter(&FLAGS_logtostderr, false);
-  auto set_alsologtostderr = ScopedFlagSetter(&FLAGS_alsologtostderr, false);
+  auto set_logtostderr = ScopedFlagSetter(&FLAGS_xls_logtostderr, false);
+  auto set_alsologtostderr = ScopedFlagSetter(&FLAGS_xls_alsologtostderr, false);
   auto set_stderrthreshold = ScopedFlagSetter(
-      &FLAGS_stderrthreshold, static_cast<int>(absl::LogSeverity::kWarning));
+      &FLAGS_xls_stderrthreshold, static_cast<int>(absl::LogSeverity::kWarning));
 
   absl::StatusOr<std::string> output = ::xls::testing::CaptureStream(
       STDERR_FILENO, [] { XLS_LOG(INFO) << "test_info_log_message"; });
@@ -123,7 +123,7 @@ TEST_F(LogFlagsTest, StderrThresholdSuppressesLoggingBelowSpecifiedLevel) {
 
 TEST_F(LogFlagsTest, StderrThresholdAllowsLoggingAtSpecifiedLevel) {
   auto set_flag = ScopedFlagSetter(
-      &FLAGS_stderrthreshold, static_cast<int>(absl::LogSeverity::kWarning));
+      &FLAGS_xls_stderrthreshold, static_cast<int>(absl::LogSeverity::kWarning));
 
   absl::StatusOr<std::string> output = ::xls::testing::CaptureStream(
       STDERR_FILENO, [] { XLS_LOG(WARNING) << "test_info_log_message"; });
@@ -133,7 +133,7 @@ TEST_F(LogFlagsTest, StderrThresholdAllowsLoggingAtSpecifiedLevel) {
 
 TEST_F(LogFlagsTest, StderrThresholdAllowsLoggingAboveSpecifiedLevel) {
   auto set_flag = ScopedFlagSetter(
-      &FLAGS_stderrthreshold, static_cast<int>(absl::LogSeverity::kWarning));
+      &FLAGS_xls_stderrthreshold, static_cast<int>(absl::LogSeverity::kWarning));
 
   absl::StatusOr<std::string> output = ::xls::testing::CaptureStream(
       STDERR_FILENO, [] { XLS_LOG(ERROR) << "test_info_log_message"; });
@@ -142,7 +142,7 @@ TEST_F(LogFlagsTest, StderrThresholdAllowsLoggingAboveSpecifiedLevel) {
 }
 
 TEST_F(LogFlagsTest, EnabledLogPrefixCausesLoggingToBePrefixed) {
-  auto set_flag = ScopedFlagSetter(&FLAGS_log_prefix, true);
+  auto set_flag = ScopedFlagSetter(&FLAGS_xls_log_prefix, true);
 
   absl::StatusOr<std::string> output = ::xls::testing::CaptureStream(
       STDERR_FILENO, [] { XLS_LOG(ERROR) << "test_info_log_message"; });
@@ -152,7 +152,7 @@ TEST_F(LogFlagsTest, EnabledLogPrefixCausesLoggingToBePrefixed) {
 }
 
 TEST_F(LogFlagsTest, DisabledLogPrefixCausesLoggingToNotBePrefixed) {
-  auto set_flag = ScopedFlagSetter(&FLAGS_log_prefix, false);
+  auto set_flag = ScopedFlagSetter(&FLAGS_xls_log_prefix, false);
 
   absl::StatusOr<std::string> output = ::xls::testing::CaptureStream(
       STDERR_FILENO, [] { XLS_LOG(ERROR) << "test_info_log_message"; });

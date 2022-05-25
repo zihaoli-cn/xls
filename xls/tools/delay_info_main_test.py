@@ -70,7 +70,7 @@ not_sum         :     1ps
     schedule_file = self.create_tempfile(content=NOT_ADD_SCHEDULE)
 
     optimized_ir = subprocess.check_output([
-        DELAY_INFO_MAIN_PATH, '--delay_model=unit', '--alsologtostderr',
+        DELAY_INFO_MAIN_PATH, '--delay_model=unit', '--xls_alsologtostderr',
         f'--schedule_path={schedule_file.full_path}', ir_file.full_path
     ]).decode('utf-8')
 

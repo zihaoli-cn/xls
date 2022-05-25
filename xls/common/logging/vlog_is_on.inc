@@ -17,12 +17,12 @@
 #include "absl/flags/flag.h"
 #include "absl/strings/numbers.h"
 
-ABSL_FLAG(int32_t, v, 0,
+ABSL_FLAG(int32_t, xls_v, 0,
           "Show all XLS_VLOG(m) messages for m <= this. Overridable by "
           "--vmodule.");
 
 ABSL_FLAG(
-    std::string, vmodule, "",
+    std::string, xls_vmodule, "",
     "per-module verbose level."
     " Argument is a comma-separated list of <module name>=<log level>."
     " <module name> is a glob pattern, matched against the filename base"
@@ -35,7 +35,7 @@ ABSL_FLAG(
     " <log level> overrides any value given by --v.")
     .OnUpdate([] {
       for (absl::string_view glob_level :
-           absl::StrSplit(absl::GetFlag(FLAGS_vmodule), ',')) {
+           absl::StrSplit(absl::GetFlag(FLAGS_xls_vmodule), ',')) {
         const size_t eq = glob_level.rfind('=');
         if (eq == glob_level.npos) continue;
         const absl::string_view glob = glob_level.substr(0, eq);

@@ -354,7 +354,7 @@ bits[64]:55
 
     shared_args = [
         EVAL_PROC_MAIN_PATH, ir_file.full_path, "--ticks", "2", "-v=3",
-        "--logtostderr", "--inputs_for_channels",
+        "--xls_logtostderr", "--inputs_for_channels",
         "in_ch={infile1},in_ch_2={infile2}".format(
             infile1=input_file.full_path,
             infile2=input_file_2.full_path), "--expected_outputs_for_channels",
@@ -389,7 +389,7 @@ bits[64]:55
 
     shared_args = [
         EVAL_PROC_MAIN_PATH, ir_file.full_path, "--ticks", "1,1", "-v=3",
-        "--logtostderr", "--inputs_for_channels",
+        "--xls_logtostderr", "--inputs_for_channels",
         "in_ch={infile1},in_ch_2={infile2}".format(
             infile1=input_file.full_path,
             infile2=input_file_2.full_path), "--expected_outputs_for_channels",
@@ -425,7 +425,7 @@ bits[64]:55
 
     shared_args = [
         EVAL_PROC_MAIN_PATH, ir_file.full_path, "--ticks", "2", "-v=3",
-        "--logtostderr", "--block_signature_proto", signature_file.full_path,
+        "--xls_logtostderr", "--block_signature_proto", signature_file.full_path,
         "--backend", "block_interpreter", "--inputs_for_channels",
         "in_ch={infile1},in_ch_2={infile2}".format(
             infile1=input_file.full_path,
@@ -459,7 +459,7 @@ bits[64]:55
 
     shared_args = [
         EVAL_PROC_MAIN_PATH, ir_file.full_path, "--ticks", "2", "-v=3",
-        "--logtostderr", "--block_signature_proto", signature_file.full_path,
+        "--xls_logtostderr", "--block_signature_proto", signature_file.full_path,
         "--backend", "block_interpreter", "--inputs_for_channels",
         "in_ch={infile1},in_ch_2={infile2}".format(
             infile1=input_file.full_path,

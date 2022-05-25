@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Exception:
-// Command '['/xls/tools/opt_main', 'sample.ir', '--logtostderr']' died with <Signals.SIGABRT: 6>.
+// Command '['/xls/tools/opt_main', 'sample.ir', '--xls_logtostderr']' died with <Signals.SIGABRT: 6>.
 //
 // options: {"codegen": true, "codegen_args": ["--use_system_verilog", "--generator=pipeline", "--pipeline_stages=3"], "convert_to_ir": true, "input_is_dslx": true, "ir_converter_args": ["--top=main"], "optimize_ir": true, "simulate": false, "simulator": null, "use_jit": true, "use_system_verilog": true}
 // args: bits[42]:0x3ff_ffff_ffff; bits[59]:0x1000_0000_0000; bits[1750]:0xa92_c000_1000_8084_0200_0901_4044_0013_2083_070b_0b22_0081_4020_a420_8400_0204_0a10_8000_2884_0100_0120_b000_4045_8200_0213_2820_1068_0002_0340_0080_0465_8098_0012_8000_6a18_0688_0000_0100_8200_8a80_52c9_4046_0103_200c_0a37_8280_7009_01a0_0011_9028_080b_0180_040a_0120_020f_4049_0502_0802_2800_3200_5085_2040_1081_3300_0004_20c0_4508_204c_a409_1088_1030_2450_9462_0041_8a00_0020_8c40_a402_0000_4208_0008_1200_0088_809f_1808_4e00_0700_8090_c198_0824_1050_0102_6802_0807_6060_b060_8482_1010_0620_0888_8044_01a2_0820_0162_0501_4830_5084_2080_0001; [bits[39]:0x0, bits[39]:0x0, bits[39]:0x76_3fff_bbfd, bits[39]:0x0, bits[39]:0x5f_7eff_fe7f, bits[39]:0x2314_5006, bits[39]:0x55_5555_5555, bits[39]:0x54_d234_3888, bits[39]:0x3f_ffff_ffff]

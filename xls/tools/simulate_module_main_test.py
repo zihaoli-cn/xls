@@ -42,12 +42,12 @@ class SimulateModuleMainTest(test_base.TestCase):
         '--generator=combinational',
         '--output_verilog_path=' + verilog_file.full_path,
         '--output_signature_path=' + signature_file.full_path,
-        '--alsologtostderr',
+        '--xls_alsologtostderr',
         ir_file.full_path,
     ])
     result = subprocess.check_output([
         SIMULATE_MODULE_MAIN_PATH, '--verilog_simulator=iverilog',
-        '--alsologtostderr', '--v=1',
+        '--xls_alsologtostderr', '--v=1',
         '--signature_file=' + signature_file.full_path,
         '--args=bits[32]:7; bits[32]:123', verilog_file.full_path
     ])
@@ -62,7 +62,7 @@ class SimulateModuleMainTest(test_base.TestCase):
         '--generator=combinational',
         '--output_verilog_path=' + verilog_file.full_path,
         '--output_signature_path=' + signature_file.full_path,
-        '--alsologtostderr',
+        '--xls_alsologtostderr',
         ir_file.full_path,
     ])
     args_file = self.create_tempfile(content="""
@@ -73,7 +73,7 @@ class SimulateModuleMainTest(test_base.TestCase):
     """)
     result = subprocess.check_output([
         SIMULATE_MODULE_MAIN_PATH, '--verilog_simulator=iverilog',
-        '--alsologtostderr', '--v=1',
+        '--xls_alsologtostderr', '--v=1',
         '--signature_file=' + signature_file.full_path,
         '--args_file=' + args_file.full_path, verilog_file.full_path
     ])

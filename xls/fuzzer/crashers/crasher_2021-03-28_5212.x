@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Exception:
-// Command '['/xls/tools/opt_main', 'sample.ir', '--logtostderr']' returned non-zero exit status 1.
+// Command '['/xls/tools/opt_main', 'sample.ir', '--xls_logtostderr']' returned non-zero exit status 1.
 // Issue: https://github.com/google/xls/issues/363
 //
 // options: {"codegen": true, "codegen_args": ["--use_system_verilog", "--generator=combinational"], "convert_to_ir": true, "input_is_dslx": true, "ir_converter_args": ["--top=main"], "optimize_ir": true, "simulate": false, "simulator": null, "use_jit": true, "use_system_verilog": true}

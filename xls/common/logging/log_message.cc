@@ -222,7 +222,7 @@ LogMessage& LogMessage::ToSinkOnly(LogSink* sink) {
 void LogMessage::Flush() {
   if (data_->has_been_flushed ||
       data_->entry.log_severity() <
-          static_cast<absl::LogSeverity>(absl::GetFlag(FLAGS_minloglevel)))
+          static_cast<absl::LogSeverity>(absl::GetFlag(FLAGS_xls_minloglevel)))
     return;
 
   if (data_->is_perror) {

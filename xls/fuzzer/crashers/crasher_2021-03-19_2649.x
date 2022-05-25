@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Exception:
-// Command '['/xls/tools/codegen_main', '--output_signature_path=module_sig.textproto', '--delay_model=unit', '--use_system_verilog', '--generator=pipeline', '--pipeline_stages=7', 'sample.opt.ir', '--logtostderr']' returned non-zero exit status 1.
+// Command '['/xls/tools/codegen_main', '--output_signature_path=module_sig.textproto', '--delay_model=unit', '--use_system_verilog', '--generator=pipeline', '--pipeline_stages=7', 'sample.opt.ir', '--xls_logtostderr']' returned non-zero exit status 1.
 // Issue: https://github.com/google/xls/issues/346
 //
 // options: {"codegen": true, "codegen_args": ["--use_system_verilog", "--generator=pipeline", "--pipeline_stages=7"], "convert_to_ir": true, "input_is_dslx": true, "ir_converter_args": ["--top=main"], "optimize_ir": true, "simulate": false, "simulator": null, "use_jit": true, "use_system_verilog": true}

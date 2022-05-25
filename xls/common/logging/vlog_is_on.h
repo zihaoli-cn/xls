@@ -50,16 +50,16 @@
 #include "absl/flags/flag.h"
 #include "absl/strings/string_view.h"
 
-ABSL_DECLARE_FLAG(int32_t, v);
+ABSL_DECLARE_FLAG(int32_t, xls_v);
 // Note: Setting vmodule with absl::SetFlag is not supported. Instead use
 // xls::SetVLOGLevel.
-ABSL_DECLARE_FLAG(std::string, vmodule);
+ABSL_DECLARE_FLAG(std::string, xls_vmodule);
 
 // We pack an int16_t verbosity level and an int16_t epoch into an
 // int32_t at every XLS_VLOG_IS_ON() call site.  The level determines
 // whether the site should log, and the epoch determines whether the
 // site is stale and should be reinitialized.  A verbosity level of
-// kUseFlag (kint16min) indicates that the value of FLAGS_v should be used as
+// kUseFlag (kint16min) indicates that the value of FLAGS_xls_v should be used as
 // the verbosity level.  When the site is (re)initialized, a verbosity
 // level for the current source file is retrieved from an internal
 // list.  This list is mutated through calls to SetVLOGLevel() and
@@ -83,7 +83,7 @@ namespace xls {
 //       that have already executed after/during InitGoogle,
 //       one needs to supply the exact --vmodule pattern that applied to them.
 //       (If no --vmodule pattern applied to them
-//       the value of FLAGS_v will continue to control them.)
+//       the value of FLAGS_xls_v will continue to control them.)
 int SetVLOGLevel(absl::string_view module_pattern, int log_level);
 
 // Private implementation details.  No user-serviceable parts inside.
@@ -95,10 +95,10 @@ namespace logging_internal {
 // global epoch is advanced, invalidating all site epochs.
 extern std::atomic<int32_t> vlog_epoch;
 
-// A log level of kUseFlag means "read the logging level from FLAGS_v."
+// A log level of kUseFlag means "read the logging level from FLAGS_xls_v."
 const int kUseFlag = (int16_t)~0x7FFF;
 
-// Log sites use FLAGS_v by default, and have an initial epoch of 0.
+// Log sites use FLAGS_xls_v by default, and have an initial epoch of 0.
 const int32_t kDefaultSite = static_cast<unsigned int>(kUseFlag) << 16;
 
 // The global epoch is the least significant half of an int32_t, and
@@ -140,7 +140,7 @@ inline bool VLogEnabled(std::atomic<int32_t>* site, int32_t level,
     int32_t site_level = SiteLevel(site_copy);
     if (site_level == kUseFlag) {
       // Use global setting instead of per-site setting.
-      site_level = absl::GetFlag(FLAGS_v);
+      site_level = absl::GetFlag(FLAGS_xls_v);
     }
     if (ABSL_PREDICT_TRUE(level > site_level)) {
       return false;

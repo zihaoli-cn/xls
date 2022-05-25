@@ -37,7 +37,7 @@ class LoggingFlagsTest(test_base.TestCase):
     self.assertNotIn('XLS_VLOG', comp.stderr)
 
   def test_log_level_0(self):
-    comp = subprocess.run([LOGGER_PATH, '--stderrthreshold=0'],
+    comp = subprocess.run([LOGGER_PATH, '--xls_stderrthreshold=0'],
                           check=True,
                           encoding='utf-8',
                           stdout=subprocess.PIPE,
@@ -49,7 +49,7 @@ class LoggingFlagsTest(test_base.TestCase):
     self.assertNotIn('XLS_VLOG', comp.stderr)
 
   def test_log_level_1(self):
-    comp = subprocess.run([LOGGER_PATH, '--stderrthreshold=1'],
+    comp = subprocess.run([LOGGER_PATH, '--xls_stderrthreshold=1'],
                           check=True,
                           encoding='utf-8',
                           stdout=subprocess.PIPE,
@@ -61,7 +61,7 @@ class LoggingFlagsTest(test_base.TestCase):
     self.assertNotIn('XLS_VLOG', comp.stderr)
 
   def test_log_level_2(self):
-    comp = subprocess.run([LOGGER_PATH, '--stderrthreshold=2'],
+    comp = subprocess.run([LOGGER_PATH, '--xls_stderrthreshold=2'],
                           check=True,
                           encoding='utf-8',
                           stdout=subprocess.PIPE,
@@ -74,7 +74,7 @@ class LoggingFlagsTest(test_base.TestCase):
 
   def test_vlog_level_1(self):
     # VLOG messages are logged at INFO level so stderr threshold must be 0.
-    comp = subprocess.run([LOGGER_PATH, '--stderrthreshold=0', '-v=1'],
+    comp = subprocess.run([LOGGER_PATH, '--xls_stderrthreshold=0', '-v=1'],
                           check=True,
                           encoding='utf-8',
                           stdout=subprocess.PIPE,
@@ -90,7 +90,7 @@ class LoggingFlagsTest(test_base.TestCase):
 
   def test_vlog_level_2(self):
     # VLOG messages are logged at INFO level so stderr threshold must be 0.
-    comp = subprocess.run([LOGGER_PATH, '--stderrthreshold=0', '-v=2'],
+    comp = subprocess.run([LOGGER_PATH, '--xls_stderrthreshold=0', '-v=2'],
                           check=True,
                           encoding='utf-8',
                           stdout=subprocess.PIPE,
@@ -105,8 +105,8 @@ class LoggingFlagsTest(test_base.TestCase):
     self.assertIn('XLS_VLOG_IS_ON(2)', comp.stderr)
 
   def test_vlog_level_2_but_stderrthreshold_too_high(self):
-    # If stderrthreshold is not zero VLOG messages do not appear.
-    comp = subprocess.run([LOGGER_PATH, '--stderrthreshold=1', '-v=2'],
+    # If xls_stderrthreshold is not zero VLOG messages do not appear.
+    comp = subprocess.run([LOGGER_PATH, '--xls_stderrthreshold=1', '-v=2'],
                           check=True,
                           encoding='utf-8',
                           stdout=subprocess.PIPE,
@@ -120,7 +120,7 @@ class LoggingFlagsTest(test_base.TestCase):
   def test_vmodule_matches_filename_level_1(self):
     # VLOG messages are logged at INFO level so stderr threshold must be 0.
     comp = subprocess.run(
-        [LOGGER_PATH, '--stderrthreshold=0', '--vmodule=logger=1'],
+        [LOGGER_PATH, '--xls_stderrthreshold=0', '--vmodule=logger=1'],
         check=True,
         encoding='utf-8',
         stdout=subprocess.PIPE,
@@ -137,7 +137,7 @@ class LoggingFlagsTest(test_base.TestCase):
   def test_vmodule_matches_filename_level_2(self):
     # VLOG messages are logged at INFO level so stderr threshold must be 0.
     comp = subprocess.run(
-        [LOGGER_PATH, '--stderrthreshold=0', '--vmodule=logger=2'],
+        [LOGGER_PATH, '--xls_stderrthreshold=0', '--vmodule=logger=2'],
         check=True,
         encoding='utf-8',
         stdout=subprocess.PIPE,
@@ -154,7 +154,7 @@ class LoggingFlagsTest(test_base.TestCase):
   def test_vmodule_not_matches_filename(self):
     # VLOG messages are logged at INFO level so stderr threshold must be 0.
     comp = subprocess.run(
-        [LOGGER_PATH, '--stderrthreshold=0', '--vmodule=foobar=2'],
+        [LOGGER_PATH, '--xls_stderrthreshold=0', '--vmodule=foobar=2'],
         check=True,
         encoding='utf-8',
         stdout=subprocess.PIPE,

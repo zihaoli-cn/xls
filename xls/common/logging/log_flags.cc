@@ -14,22 +14,22 @@
 
 #include "xls/common/logging/log_flags.h"
 
-ABSL_FLAG(int, minloglevel,
+ABSL_FLAG(int, xls_minloglevel,
           static_cast<int>(absl::LogSeverity::kInfo),
           "Messages logged at a lower level than this don't actually "
           "get logged anywhere");
 
-ABSL_FLAG(bool, logtostderr, false,
+ABSL_FLAG(bool, xls_logtostderr, false,
           "log messages go to stderr instead of logfiles");
 
-ABSL_FLAG(bool, alsologtostderr, false,
+ABSL_FLAG(bool, xls_alsologtostderr, false,
           "log messages go to stderr in addition to logfiles");
 
-ABSL_FLAG(int, stderrthreshold, static_cast<int>(absl::LogSeverity::kError),
+ABSL_FLAG(int, xls_stderrthreshold, static_cast<int>(absl::LogSeverity::kError),
           "log messages at or above this level are copied to stderr in "
-          "addition to logfiles. This flag obsoletes --alsologtostderr. ");
+          "addition to logfiles. This flag obsoletes --xls_alsologtostderr. ");
 
-ABSL_FLAG(bool, log_prefix, true,
+ABSL_FLAG(bool, xls_log_prefix, true,
           "Prepend the log prefix to the start of each log line");
 
 namespace absl {
@@ -46,11 +46,11 @@ static absl::LogSeverityAtLeast NormalizedSeverity(int parameter) {
 }
 
 absl::LogSeverityAtLeast StderrThreshold() {
-  if (absl::GetFlag(FLAGS_logtostderr) ||
-      absl::GetFlag(FLAGS_alsologtostderr)) {
+  if (absl::GetFlag(FLAGS_xls_logtostderr) ||
+      absl::GetFlag(FLAGS_xls_alsologtostderr)) {
     return absl::LogSeverityAtLeast::kInfo;
   } else {
-    return NormalizedSeverity(absl::GetFlag(FLAGS_stderrthreshold));
+    return NormalizedSeverity(absl::GetFlag(FLAGS_xls_stderrthreshold));
   }
 }
 

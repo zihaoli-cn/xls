@@ -15,11 +15,11 @@
 #include "absl/base/log_severity.h"
 #include "absl/flags/declare.h"
 
-ABSL_DECLARE_FLAG(int, minloglevel);
-ABSL_DECLARE_FLAG(bool, logtostderr);
-ABSL_DECLARE_FLAG(bool, alsologtostderr);
-ABSL_DECLARE_FLAG(int, stderrthreshold);
-ABSL_DECLARE_FLAG(bool, log_prefix);
+ABSL_DECLARE_FLAG(int, xls_minloglevel);
+ABSL_DECLARE_FLAG(bool, xls_logtostderr);
+ABSL_DECLARE_FLAG(bool, xls_alsologtostderr);
+ABSL_DECLARE_FLAG(int, xls_stderrthreshold);
+ABSL_DECLARE_FLAG(bool, xls_log_prefix);
 
 namespace absl {
 

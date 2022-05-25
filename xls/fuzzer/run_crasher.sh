@@ -14,5 +14,5 @@
 # limitations under the License.
 
 BINPATH=./xls/fuzzer/run_crasher
-$BINPATH --alsologtostderr "$@" || exit -1
+$BINPATH --xls_alsologtostderr "$@" || exit -1
 echo "PASS!"

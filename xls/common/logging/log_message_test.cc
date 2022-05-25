@@ -50,7 +50,7 @@ struct Locs {
 
 class LogMessageTest : public testing::LoggingTestBase {
  public:
-  LogMessageTest() { absl::SetFlag(&FLAGS_logtostderr, false); }
+  LogMessageTest() { absl::SetFlag(&FLAGS_xls_logtostderr, false); }
 };
 
 TEST_F(LogMessageTest, FailedCheckPrintsCheckFailed) {

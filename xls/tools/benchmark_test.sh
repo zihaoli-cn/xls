@@ -15,5 +15,5 @@
 
 
 ./xls/tools/benchmark_main \
-  --vmodule=delay_estimator_main=1 --alsologtostderr "$@" || exit -1
+  --vmodule=delay_estimator_main=1 --xls_alsologtostderr "$@" || exit -1
 echo "PASS!"

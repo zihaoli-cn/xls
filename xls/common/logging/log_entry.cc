@@ -137,7 +137,7 @@ void LogEntry::AppendSeverityTimeAndThreadId(std::string* out) const {
 
 std::string LogEntry::FormatPrefix() const {
   std::string prefix;
-  if (!absl::GetFlag(FLAGS_log_prefix) || !prefix_ || line_ == -1)
+  if (!absl::GetFlag(FLAGS_xls_log_prefix) || !prefix_ || line_ == -1)
     return prefix;
   // Generate a prefix like:
   // 'I0513 17:35:46.294773   27319 logging_unittest.cc:147] '

@@ -65,7 +65,7 @@ bool SafeFNMatch(absl::string_view pattern, absl::string_view str) {
 }
 }  // namespace logging_internal
 
-// List of per-module log levels from FLAGS_vmodule.  Once created
+// List of per-module log levels from FLAGS_xls_vmodule.  Once created
 // each element is never deleted/modified except for the vlog_level:
 // other threads will read VModuleInfo blobs w/o locks.  We can't use
 // an STL struct here as we wouldn't know when it's safe to
@@ -88,7 +88,7 @@ std::atomic<int32_t> xls::logging_internal::vlog_epoch{1};
 
 // This can be called very early, so we use SpinLock and RAW_VLOG here.
 int SetVLOGLevel(absl::string_view module_pattern, int log_level) {
-  int result = absl::GetFlag(FLAGS_v);
+  int result = absl::GetFlag(FLAGS_xls_v);
   bool found = false;
   absl::base_internal::SpinLockHolder l(
       &logging_internal::vmodule_lock);  // protect whole read-modify-write
@@ -217,7 +217,7 @@ bool VLogEnabledSlow(std::atomic<int32_t>* site, int32_t level,
 
   if (site_level == kUseFlag) {
     // Use global setting instead of per-site setting.
-    site_level = absl::GetFlag(FLAGS_v);
+    site_level = absl::GetFlag(FLAGS_xls_v);
   }
   return ABSL_PREDICT_FALSE(site_level >= level);
 }

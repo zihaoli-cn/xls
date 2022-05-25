@@ -71,8 +71,8 @@ def _write_ir_summaries(run_dir: str,
   subprocess.run(
       [
           SUMMARIZE_IR_MAIN_PATH,
-          '--logtostderr',
-          '--minloglevel=2',
+          '--xls_logtostderr',
+          '--xls_minloglevel=2',
           '--summary_file=' + summary_path,
           '--timing=' + str(timing),
       ] + args,
@@ -107,7 +107,7 @@ def run_sample(smp: sample.Sample,
 
   # Create a script named 'run.sh' for rerunning the sample.
   args = [
-      SAMPLE_RUNNER_MAIN_PATH, '--logtostderr', '--input_file=sample.x',
+      SAMPLE_RUNNER_MAIN_PATH, '--xls_logtostderr', '--input_file=sample.x',
       '--options_file=options.json'
   ]
   if smp.args_batch:
@@ -165,7 +165,7 @@ def minimize_ir(smp: sample.Sample,
     # the sample fails so invert the return code of the invocation of
     # sample_runner_main with '!'.
     args = [
-        SAMPLE_RUNNER_MAIN_PATH, '--logtostderr',
+        SAMPLE_RUNNER_MAIN_PATH, '--xls_logtostderr',
         '--options_file=ir_minimizer.options.json', '--args_file=args.txt',
         '--input_file=$1'
     ]
@@ -175,7 +175,7 @@ def minimize_ir(smp: sample.Sample,
         f'#!/bin/sh\n! {" ".join(args)}',
         executable=True)
     comp = subprocess.run([
-        IR_MINIMIZER_MAIN_PATH, '--logtostderr',
+        IR_MINIMIZER_MAIN_PATH, '--xls_logtostderr',
         '--test_executable=ir_minimizer_test.sh', 'sample.ir'
     ],
                           cwd=run_dir,
@@ -208,7 +208,7 @@ def minimize_ir(smp: sample.Sample,
         failed_input = comp.stdout.decode('utf-8')
         comp = subprocess.run(
             [
-                IR_MINIMIZER_MAIN_PATH, '--logtostderr', '--test_llvm_jit',
+                IR_MINIMIZER_MAIN_PATH, '--xls_logtostderr', '--test_llvm_jit',
                 '--use_optimization_pipeline', '--input=' + failed_input,
                 'sample.ir'
             ] + extra_args,

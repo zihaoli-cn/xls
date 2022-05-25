@@ -220,10 +220,10 @@ TEST(StatusBuilderTest, LogToMultipleErrorLevelsLvalue) {
     ConvertToStatusAndIgnore(builder.Log(LogSeverity::kError) << "yes!");
 
     // This one shouldn't log because vlogging is disabled.
-    absl::SetFlag(&FLAGS_v, 0);
+    absl::SetFlag(&FLAGS_xls_v, 0);
     ConvertToStatusAndIgnore(builder.VLog(2) << "Non!");
 
-    absl::SetFlag(&FLAGS_v, 2);
+    absl::SetFlag(&FLAGS_xls_v, 2);
     ConvertToStatusAndIgnore(builder.VLog(2) << "Oui!");
   }
 }
@@ -241,10 +241,10 @@ TEST(StatusBuilderTest, LogToMultipleErrorLevelsRvalue) {
                                .Log(LogSeverity::kError)
                            << "yes!");
   // This one shouldn't log because vlogging is disabled.
-  absl::SetFlag(&FLAGS_v, 0);
+  absl::SetFlag(&FLAGS_xls_v, 0);
   ConvertToStatusAndIgnore(
       StatusBuilder(absl::AbortedError(""), Locs::kSecret).VLog(2) << "Non!");
-  absl::SetFlag(&FLAGS_v, 2);
+  absl::SetFlag(&FLAGS_xls_v, 2);
   ConvertToStatusAndIgnore(
       StatusBuilder(absl::AbortedError(""), Locs::kSecret).VLog(2) << "Oui!");
 }
@@ -368,7 +368,7 @@ TEST(StatusBuilderTest, LogEveryZeroDuration) {
 }
 
 TEST(StatusBuilderTest, VLogModuleLvalue) {
-  absl::SetFlag(&FLAGS_v, 0);
+  absl::SetFlag(&FLAGS_xls_v, 0);
   xls::SetVLOGLevel("level0", 0);
   xls::SetVLOGLevel("level1", 1);
   xls::SetVLOGLevel("level2", 2);
@@ -413,7 +413,7 @@ TEST(StatusBuilderTest, VLogModuleLvalue) {
 }
 
 TEST(StatusBuilderTest, VLogModuleRvalue) {
-  absl::SetFlag(&FLAGS_v, 0);
+  absl::SetFlag(&FLAGS_xls_v, 0);
   xls::SetVLOGLevel("level0", 0);
   xls::SetVLOGLevel("level1", 1);
   xls::SetVLOGLevel("level2", 2);

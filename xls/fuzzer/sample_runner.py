@@ -246,7 +246,7 @@ class SampleRunner:
     stderr_path = os.path.join(self._run_dir, basename + '.stderr')
     with open(stderr_path, 'w') as f_stderr:
       comp = subprocess.run(
-          list(args) + ['--logtostderr'],
+          list(args) + ['--xls_logtostderr'],
           cwd=self._run_dir,
           stdout=subprocess.PIPE,
           stderr=f_stderr,

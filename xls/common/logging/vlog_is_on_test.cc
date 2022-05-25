@@ -29,36 +29,36 @@ class VlogIsOnTest : public ::testing::Test {
 };
 
 TEST_F(VlogIsOnTest, GlobalFlagIsUsedByDefault) {
-  absl::SetFlag(&FLAGS_v, 4);
+  absl::SetFlag(&FLAGS_xls_v, 4);
   ExpectVlogLevel(4);
 }
 
 TEST_F(VlogIsOnTest, MismatchingModuleNamePatternDoesNotApply) {
-  absl::SetFlag(&FLAGS_v, 5);
+  absl::SetFlag(&FLAGS_xls_v, 5);
   SetVLOGLevel("something_else", 10);
   ExpectVlogLevel(5);
 }
 
 TEST_F(VlogIsOnTest, MismatchingModuleDirectoryWildcardPatternDoesNotApply) {
-  absl::SetFlag(&FLAGS_v, 5);
+  absl::SetFlag(&FLAGS_xls_v, 5);
   SetVLOGLevel("*/other_dir/*", 10);
   ExpectVlogLevel(5);
 }
 
 TEST_F(VlogIsOnTest, ModuleNamePatternApplies) {
-  absl::SetFlag(&FLAGS_v, 5);
+  absl::SetFlag(&FLAGS_xls_v, 5);
   SetVLOGLevel("vlog_is_on_test", 10);
   ExpectVlogLevel(10);
 }
 
 TEST_F(VlogIsOnTest, ModuleNameWithWildcardPatternApplies) {
-  absl::SetFlag(&FLAGS_v, 5);
+  absl::SetFlag(&FLAGS_xls_v, 5);
   SetVLOGLevel("vlog_is_on*", 10);
   ExpectVlogLevel(10);
 }
 
 TEST_F(VlogIsOnTest, ModuleNameWithDirectoryWildcardPatternApplies) {
-  absl::SetFlag(&FLAGS_v, 5);
+  absl::SetFlag(&FLAGS_xls_v, 5);
   SetVLOGLevel("*/common/*", 10);
   ExpectVlogLevel(10);
 }

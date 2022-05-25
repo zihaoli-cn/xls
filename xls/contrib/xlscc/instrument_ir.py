@@ -778,7 +778,7 @@ def main(argv):
     ]
     if FLAGS.block_signature_proto:
       args += ["--block_signature_proto", FLAGS.block_signature_proto]
-    args += ["-v=1", "--logtostderr"]
+    args += ["-v=1", "--xls_logtostderr"]
     print("Eval command: ", " ".join(args))
     subprocess.check_output(args)
 

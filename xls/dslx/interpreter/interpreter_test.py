@@ -410,7 +410,7 @@ class InterpreterTest(test_base.TestCase):
     program_file = self.create_tempfile(content=program)
     # Trace is logged with XLS_LOG(INFO) so log to stderr to capture output.
     cmd = [
-        _INTERP_PATH, '--compare=none', '--alsologtostderr',
+        _INTERP_PATH, '--compare=none', '--xls_alsologtostderr',
         program_file.full_path
     ]
     result = subp.run(cmd, stderr=subp.PIPE, encoding='utf-8', check=True)
@@ -435,7 +435,7 @@ class InterpreterTest(test_base.TestCase):
     # Note: no support for `trace_fmt!` in IR.
     # Trace is logged with XLS_LOG(INFO) so log to stderr to capture output.
     cmd = [
-        _INTERP_PATH, '--compare=none', '--alsologtostderr',
+        _INTERP_PATH, '--compare=none', '--xls_alsologtostderr',
         program_file.full_path
     ]
     result = subp.run(cmd, stderr=subp.PIPE, encoding='utf-8', check=True)

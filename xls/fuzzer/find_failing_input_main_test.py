@@ -67,7 +67,7 @@ class EvalMainTest(test_base.TestCase):
                            'bits[32]:0x0; bits[32]:0x0')))
     result = subprocess.check_output([
         FIND_FAILING_INPUT_MAIN, '--input_file=' + input_file.full_path,
-        '--alsologtostderr', '--test_only_inject_jit_result=bits[32]:0x0',
+        '--xls_alsologtostderr', '--test_only_inject_jit_result=bits[32]:0x0',
         ir_file.full_path
     ],
                                      stderr=subprocess.PIPE)
