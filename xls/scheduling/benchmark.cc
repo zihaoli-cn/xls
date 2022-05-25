@@ -108,9 +108,13 @@ absl::Status RealMain() {
 
     int64_t clk_min = 3;
     int64_t clk_max = max_delay/2;
+    double sdc_work_time = 0.0;
     for(int64_t clk = clk_min;
         clk < clk_max;
         clk += 1){
+      if(sdc_work_time > 200){
+          break;
+      }
       SchedulingOptions sdc_exact_options(SchedulingStrategy::MINIMIZE_REGISTERS_SDC);
       SchedulingOptions cut_options(SchedulingStrategy::MINIMIZE_REGISTERS);
       cut_options.clock_period_ps(clk);
@@ -120,10 +124,7 @@ absl::Status RealMain() {
       XLS_ASSIGN_OR_RETURN(
           PipelineSchedule sdc_exact_schedule,
           PipelineSchedule::Run(f, TestDelayEstimator(), sdc_exact_options));
-      double sdc_work_time = (clock() - t) / double(CLOCKS_PER_SEC);
-      if(sdc_work_time > 300){
-          break;
-      }
+      sdc_work_time = (clock() - t) / double(CLOCKS_PER_SEC);
 
       t = clock();
       XLS_ASSIGN_OR_RETURN(

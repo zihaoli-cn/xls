@@ -290,7 +290,7 @@ absl::StatusOr<ScheduleCycleMap> ScheduleToMinimizeRegistersSDC(
 #endif
   or_tools::ProblemStatus status = solver.Solve(lp);
 #ifdef LOG_SDC_INTERNAL_RUNNING_TIME_TO_CERR
-  std::cerr << absl::StrFormat("%.4e", (clock() - t) / double(CLOCKS_PER_SEC)) << std::endl;
+  std::cerr << absl::StrFormat("%.4e", (clock() - t) / double(CLOCKS_PER_SEC)) << "," << lp.num_constraints().value()<< std::endl;
 #endif
 
   // Check that the problem has an optimal solution.
