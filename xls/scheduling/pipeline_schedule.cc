@@ -257,6 +257,7 @@ absl::StatusOr<ScheduleCycleMap> ScheduleToMinimizeRegistersSDC(
   }
 
 #ifdef LOG_SDC_INTERNAL_RUNNING_TIME_TO_CERR
+  int64_t clock_cycle_related_constraints = 0;
   clock_t t = clock();
 #endif
   XLS_ASSIGN_OR_RETURN(auto delay_map, ComputeNodeDelays(f, delay_estimator));
@@ -267,6 +268,9 @@ absl::StatusOr<ScheduleCycleMap> ScheduleToMinimizeRegistersSDC(
       lp.SetConstraintBounds(constraint, 1, infinity);
       lp.SetCoefficient(constraint, cycle_var[dst], 1);
       lp.SetCoefficient(constraint, cycle_var[src], -1);
+#ifdef LOG_SDC_INTERNAL_RUNNING_TIME_TO_CERR
+      clock_cycle_related_constraints++;
+#endif
     }
   }
 #ifdef LOG_SDC_INTERNAL_RUNNING_TIME_TO_CERR
@@ -290,7 +294,9 @@ absl::StatusOr<ScheduleCycleMap> ScheduleToMinimizeRegistersSDC(
 #endif
   or_tools::ProblemStatus status = solver.Solve(lp);
 #ifdef LOG_SDC_INTERNAL_RUNNING_TIME_TO_CERR
-  std::cerr << absl::StrFormat("%.4e", (clock() - t) / double(CLOCKS_PER_SEC)) << "," << lp.num_constraints().value()<< std::endl;
+  std::cerr << absl::StrFormat("%.4e", (clock() - t) / double(CLOCKS_PER_SEC)) << "," 
+            << lp.num_constraints().value() << "," 
+            << clock_cycle_related_constraints << std::endl;
 #endif
 
   // Check that the problem has an optimal solution.

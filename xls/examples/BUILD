@@ -401,7 +401,6 @@ filegroup(
     name = "scheduling_examples",
     srcs = [
         "//xls/examples/jpeg:idct_chen.opt.ir",
-        "//xls/examples/dslx_intro:crc32_one_byte_inferred.opt.ir",
         "//xls/examples/dslx_intro:crc32_one_byte.opt.ir",
         ":crc32.opt.ir",
         ":hack_cpu.opt.ir",

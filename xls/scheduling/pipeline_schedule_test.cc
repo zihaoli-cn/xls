@@ -831,12 +831,15 @@ TEST_F(PipelineScheduleTest, BenchmarkTest) {
       XLS_ASSERT_OK_AND_ASSIGN(
           PipelineSchedule sdc_exact_schedule,
           PipelineSchedule::Run(f, TestDelayEstimator(), sdc_exact_options));
-      XLS_EXPECT_OK(sdc_exact_schedule.Verify());
-      XLS_EXPECT_OK(sdc_exact_schedule.VerifyTiming(clk, TestDelayEstimator()));
 
       XLS_ASSERT_OK_AND_ASSIGN(
           PipelineSchedule cut_schedule,
           PipelineSchedule::Run(f, TestDelayEstimator(), cut_options));
+      
+      XLS_EXPECT_OK(sdc_exact_schedule.Verify());
+      XLS_EXPECT_OK(sdc_exact_schedule.VerifyTiming(clk, TestDelayEstimator()));
+      XLS_CHECK_LE(sdc_exact_schedule.CountFinalInteriorPipelineRegisters(), 
+                   cut_schedule.CountFinalInteriorPipelineRegisters());
     }
   }
 }

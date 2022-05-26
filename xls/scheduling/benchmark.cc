@@ -132,17 +132,17 @@ absl::Status RealMain() {
           PipelineSchedule::Run(f, TestDelayEstimator(), cut_options));
       double cut_work_time = (clock() - t) / double(CLOCKS_PER_SEC);
 
-      int64_t result_sdc = sdc_exact_schedule.CountFinalInteriorPipelineRegisters();
-      int64_t result_cut = cut_schedule.CountFinalInteriorPipelineRegisters();
-      XLS_CHECK_LE(result_sdc, result_cut);
+      int64_t bits_sdc = sdc_exact_schedule.CountFinalInteriorPipelineRegisters();
+      int64_t bits_min_cut = cut_schedule.CountFinalInteriorPipelineRegisters();
+      XLS_CHECK_LE(bits_sdc, bits_min_cut);
 
-      int64_t reduced_register_width = result_cut - result_sdc;
-      double boost = (double)reduced_register_width/(double)result_sdc;
+      int64_t reduced_register_width = bits_min_cut - bits_sdc;
+      double boost = (double)reduced_register_width/(double)bits_sdc;
       
       boost_ratios.push_back(boost);
       reduced_register_widths.push_back(reduced_register_width);
-      data_points.push_back(absl::StrFormat("{\"clk\":%lld, \"time_sdc\":%.4e, \"time_cut\":%.4e, \"result_sdc\":%lld, \"result_cut\":%lld, \"reduced_bits\":%lld, \"boost\":%.4e}", 
-                       clk, sdc_work_time, cut_work_time, result_sdc, result_cut, reduced_register_width, boost));
+      data_points.push_back(absl::StrFormat("{\"clk\":%lld, \"t_sdc\":%.4e, \"t_min_cut\":%.4e, \"bits_sdc\":%lld, \"bits_min_cut\":%lld, \"reduced_bits\":%lld, \"boost\":%.4e}", 
+                       clk, sdc_work_time, cut_work_time, bits_sdc, bits_min_cut, reduced_register_width, boost));
 
 #ifdef ENABLE_LOG_TO_CERR
       std::cerr << benchmark_name << ":\n\t" 
@@ -155,7 +155,7 @@ absl::Status RealMain() {
         return acc + node->users().size();
     });
 
-    sample_results.push_back(absl::StrFormat("{\"name\":\"%s\", \"max_delay\":%lld, \"node_count\":%lld, \"edge_count\":%lld, \"avg_boost\":%.4e, \"avg_reduced_width\":%lld, \"data\" : [%s]}", benchmark_name, max_delay, f->node_count(), edge_count, avg_ratio, avg_reduced_width, absl::StrJoin(data_points, ",")));
+    sample_results.push_back(absl::StrFormat("{\"name\":\"%s\", \"cp\":%lld, \"nodes\":%lld, \"edges\":%lld, \"avg\":%.4e, \"avg_raw\":%lld, \"data\" : [%s]}", benchmark_name, max_delay, f->node_count(), edge_count, avg_ratio, avg_reduced_width, absl::StrJoin(data_points, ",")));
 
 #ifdef ENABLE_LOG_TO_CERR
     std::cerr << "====\n" << sample_results.back() << "\n====\n" << std::endl;
