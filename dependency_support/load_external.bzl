@@ -15,7 +15,7 @@
 """Provides helper that loads external repositories with third-party code."""
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository", "new_git_repository")
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 load("//dependency_support/boost:workspace.bzl", repo_boost = "repo")
 load("//dependency_support/llvm_bazel:workspace.bzl", repo_llvm_bazel = "repo")
 load("//dependency_support/rules_hdl:workspace.bzl", repo_rules_hdl = "repo")
@@ -61,12 +61,13 @@ def load_external_repositories():
         shallow_since = "1635790430 +0000",
     )
 
-    # Commit on 2021-12-03, current as of 2022-05-04
+    # Commit on 2021-12-03, current as of 2022-05-31
     http_archive(
         name = "pybind11_bazel",
         strip_prefix = "pybind11_bazel-72cbbf1fbc830e487e3012862b7b720001b70672",
         urls = ["https://github.com/pybind/pybind11_bazel/archive/72cbbf1fbc830e487e3012862b7b720001b70672.tar.gz"],
         sha256 = "516c1b3a10d87740d2b7de6f121f8e19dde2c372ecbfe59aef44cd1872c10395",
+        patches = ["@com_google_xls//dependency_support/pybind11_bazel:sysconfig_fix.patch"],
     )
 
     http_archive(
@@ -114,10 +115,13 @@ def load_external_repositories():
         ],
     )
 
+    # Released on 2022-04-22, current as of 2022-05-27
+    # https://github.com/bazelbuild/rules_python/releases/tag/0.8.1
     http_archive(
         name = "rules_python",
-        url = "https://github.com/bazelbuild/rules_python/releases/download/0.1.0/rules_python-0.1.0.tar.gz",
-        sha256 = "b6d46438523a3ec0f3cead544190ee13223a52f6a6765a29eae7b7cc24cc83a0",
+        sha256 = "cdf6b84084aad8f10bf20b46b77cb48d83c319ebe6458a18e9d2cebf57807cdd",
+        strip_prefix = "rules_python-0.8.1",
+        url = "https://github.com/bazelbuild/rules_python/archive/refs/tags/0.8.1.tar.gz",
     )
 
     http_archive(
@@ -159,11 +163,13 @@ def load_external_repositories():
         build_file = "@com_google_xls//dependency_support/linenoise:bundled.BUILD.bazel",
     )
 
+    # Released on 2022-05-20, current as of 2022-05-31.
+    # https://github.com/grpc/grpc/releases/tag/v1.46.3
     http_archive(
         name = "com_github_grpc_grpc",
-        urls = ["https://github.com/grpc/grpc/archive/v1.43.0.tar.gz"],
-        sha256 = "9647220c699cea4dafa92ec0917c25c7812be51a18143af047e20f3fb05adddc",
-        strip_prefix = "grpc-1.43.0",
+        urls = ["https://github.com/grpc/grpc/archive/v1.46.3.tar.gz"],
+        sha256 = "d6cbf22cb5007af71b61c6be316a79397469c58c82a942552a62e708bce60964",
+        strip_prefix = "grpc-1.46.3",
         # repo_mapping = {"@com_github_google_re2": "@com_googlesource_code_re2"},
         # Note: repo mapping doesn't seem to work for gRPC because it
         # explicitly binds the re2 name to the com_googlesource_code_re2 repo.
@@ -183,39 +189,18 @@ def load_external_repositories():
 
     git_repository(
         name = "platforms",
-        tag = "0.0.5",
         remote = "https://github.com/bazelbuild/platforms.git",
+        # Apparently the arguments below are the reproducible form of this tag.
+        # tag = "0.0.5",
+        commit = "fbd0d188dac49fbcab3d2876a2113507e6fc68e9",
+        shallow_since = "1644333305 -0500",
     )
 
-
-    http_archive(
-        name = "bliss",
-        build_file = "@com_google_ortools//bazel:bliss.BUILD",
-        patches = ["@com_google_ortools//bazel:bliss-0.73.patch"],
-        sha256 = "f57bf32804140cad58b1240b804e0dbd68f7e6bf67eba8e0c0fa3a62fd7f0f84",
-        url = "http://www.tcs.hut.fi/Software/bliss/bliss-0.73.zip",
-    )
-
-    # Eigen has no Bazel build.
-    new_git_repository(
-        name = "eigen",
-        tag = "3.4.0",
-        remote = "https://gitlab.com/libeigen/eigen.git",
-        build_file_content ="""
-cc_library(
-    name = 'eigen3',
-    srcs = [],
-    includes = ['.'],
-    hdrs = glob(['Eigen/**']),
-    visibility = ['//visibility:public'],
-)"""
-    )
-    
     git_repository(
         name = "com_google_ortools",
-        #branch = "master",
         commit = "525162feaadaeef640783b2eaea38cf4b623877f",
         shallow_since = "1647023481 +0100",
-        #tag = "v9.3",
         remote = "https://github.com/google/or-tools.git",
+        # Removes undesired dependencies like Eigen, BLISS, SCIP
+        patches = ["@com_google_xls//dependency_support/com_google_ortools:remove_deps.diff"],
     )

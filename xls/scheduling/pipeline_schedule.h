@@ -37,6 +37,7 @@ enum class SchedulingStrategy {
 
   // Minimize the number of pipeline registers when scheduling using SDC-method
   MINIMIZE_REGISTERS_SDC,
+  MINIMIZE_REGISTERS_SDC_FAST,
 };
 
 // Returns the list of ordering of cycles (pipeline stages) in which to compute
