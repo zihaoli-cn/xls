@@ -765,7 +765,8 @@ class DelayEstimatorWithInputDelay : public DelayEstimator {
     }
   }
 
-  XLS_RETURN_IF_ERROR(Rematerialization(f, &cycle_map).status());
+  XLS_RETURN_IF_ERROR(
+      Rematerialization(f, &cycle_map, delay_estimator).status());
 
   auto schedule = PipelineSchedule(f, cycle_map, options.pipeline_stages());
   XLS_RETURN_IF_ERROR(

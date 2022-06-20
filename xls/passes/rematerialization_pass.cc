@@ -26,7 +26,170 @@
 
 namespace xls {
 
-namespace {}  // namespace
+namespace {
+
+int64_t NumberOfPipelineStages(
+    const absl::flat_hash_map<Node*, int64_t>& schedule) {
+  int64_t max_stage = -1;
+  for (const auto& [node, stage] : schedule) {
+    max_stage = std::max(max_stage, stage);
+  }
+  return max_stage + 1;
+}
+
+// This data structure is similar to `ScheduleCycleMap`, except it answers the
+// question "what nodes are in a given pipeline stage?".
+using InverseSchedule = std::vector<absl::flat_hash_set<Node*>>;
+
+// Compute an `InverseSchedule` from a given `ScheduleCycleMap`.
+InverseSchedule InvertSchedule(
+    const absl::flat_hash_map<Node*, int64_t>& schedule) {
+  InverseSchedule result;
+  result.resize(NumberOfPipelineStages(schedule));
+  for (const auto& [node, stage] : schedule) {
+    result[stage].insert(node);
+  }
+  return result;
+}
+
+using Delay = int64_t;
+
+using LongestPathLength =
+    absl::flat_hash_map<Node*, absl::flat_hash_map<Node*, Delay>>;
+
+absl::StatusOr<LongestPathLength> LongestNodePaths(
+    FunctionBase* f, const DelayEstimator& delay_estimator) {
+  absl::flat_hash_map<Node*, Delay> delay_map;
+
+  for (Node* node : TopoSort(f)) {
+    XLS_ASSIGN_OR_RETURN(delay_map[node],
+                         delay_estimator.GetOperationDelayInPs(node));
+  }
+
+  LongestPathLength result;
+
+  for (Node* node : TopoSort(f)) {
+    // The graph must be acyclic, so the longest path from any vertex to
+    // itself has weight equal to the weight of that vertex.
+    result[node] = {{node, delay_map.at(node)}};
+  }
+
+  for (Node* node : TopoSort(f)) {
+    for (auto& [source, targets] : result) {
+      for (Node* operand : node->operands()) {
+        if (targets.contains(operand)) {
+          Delay new_delay = targets[operand] + delay_map.at(node);
+          targets[node] = targets.contains(node)
+                              ? std::max(targets.at(node), new_delay)
+                              : new_delay;
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+struct Slack {
+  // The delay of the longest path starting at an entry node of the current
+  // pipeline stage and ending at a given node, not including the delay of that
+  // node.
+  Delay longest_path_into;
+
+  // The delay of the longest path starting at a given node and ending at an
+  // exit node of the current pipeline stage, not including the delay of the
+  // given node.
+  Delay longest_path_out_of;
+
+  // The slack of the given node, which is equal to
+  // `stage_critical_path - (longest_path_into + delay + longest_path_out_of)`
+  // where `delay` is the delay of the given node.
+  Delay slack;
+
+  // The critical path delay of the stage of a given node.
+  Delay stage_critical_path;
+};
+
+absl::flat_hash_map<Node*, Slack> ComputeSlack(
+    FunctionBase* f, const InverseSchedule& inverse_schedule,
+    const LongestPathLength& longest) {
+  absl::flat_hash_map<Node*, Slack> slack;
+
+  for (int64_t stage = 0; stage < inverse_schedule.size(); ++stage) {
+    absl::flat_hash_set<Node*> stage_nodes = inverse_schedule[stage];
+    absl::flat_hash_set<Node*> entry_nodes;
+    absl::flat_hash_set<Node*> exit_nodes;
+
+    for (Node* node : stage_nodes) {
+      auto operands = node->operands();
+      if (std::none_of(operands.begin(), operands.end(),
+                       [&](Node* n) { return stage_nodes.contains(n); })) {
+        entry_nodes.insert(node);
+      }
+      auto users = node->users();
+      if (!users.empty()  // omit dead nodes
+          && std::none_of(users.begin(), users.end(),
+                          [&](Node* n) { return stage_nodes.contains(n); })) {
+        exit_nodes.insert(node);
+      }
+    }
+
+    int64_t stage_critical_length = 0;
+
+    for (Node* entry : entry_nodes) {
+      for (Node* exit : exit_nodes) {
+        if (longest.at(entry).contains(exit)) {
+          stage_critical_length =
+              std::max(stage_critical_length, longest.at(entry).at(exit));
+        }
+      }
+    }
+
+    for (Node* node : stage_nodes) {
+      bool path_exists = false;
+
+      int64_t entry_to_node_max = 0;
+      for (Node* entry : entry_nodes) {
+        if (longest.at(entry).contains(node)) {
+          entry_to_node_max =
+              std::max(entry_to_node_max, longest.at(entry).at(node));
+          path_exists = true;
+        }
+      }
+
+      int64_t node_to_exit_max = 0;
+      for (Node* entry : entry_nodes) {
+        if (longest.at(entry).contains(node)) {
+          node_to_exit_max =
+              std::max(node_to_exit_max, longest.at(entry).at(node));
+          path_exists = true;
+        }
+      }
+
+      if (!path_exists) {
+        // If a node is dead, there may not exist a path
+        continue;
+      }
+
+      // Avoid double-counting the delay of the node itself
+      Delay node_delay = longest.at(node).at(node);
+      entry_to_node_max -= node_delay;
+      node_to_exit_max -= node_delay;
+
+      int64_t entry_to_exit_through_node_max =
+          entry_to_node_max + node_delay + node_to_exit_max;
+
+      slack[node] =
+          Slack{entry_to_node_max, node_to_exit_max,
+                stage_critical_length - entry_to_exit_through_node_max,
+                stage_critical_length};
+    }
+  }
+
+  return slack;
+}
+
+}  // namespace
 
 // An opportunity for rematerialization.
 // TODO(taktoa): somehow refactor this so that it talks about rematerializing
@@ -63,30 +226,6 @@ struct RematOpportunity {
                       ro.quality);
   }
 };
-
-int64_t NumberOfPipelineStages(
-    const absl::flat_hash_map<Node*, int64_t>& schedule) {
-  int64_t max_stage = -1;
-  for (const auto& [node, stage] : schedule) {
-    max_stage = std::max(max_stage, stage);
-  }
-  return max_stage + 1;
-}
-
-// This data structure is similar to `ScheduleCycleMap`, except it answers the
-// question "what nodes are in a given pipeline stage?".
-using InverseSchedule = std::vector<absl::flat_hash_set<Node*>>;
-
-// Compute an `InverseSchedule` from a given `ScheduleCycleMap`.
-InverseSchedule InvertSchedule(
-    const absl::flat_hash_map<Node*, int64_t>& schedule) {
-  InverseSchedule result;
-  result.resize(NumberOfPipelineStages(schedule));
-  for (const auto& [node, stage] : schedule) {
-    result[stage].insert(node);
-  }
-  return result;
-}
 
 // Returns for a given dead node, the largest "contiguous" set of dead nodes
 // that feed into this node.
@@ -211,11 +350,11 @@ FindRematerializationOpportunitiesAtNode(
 // same pipeline stage as the `to_rematerialize` node.
 absl::StatusOr<std::vector<RematOpportunity>>
 FindRematerializationOpportunities(
-    FunctionBase* f, const absl::flat_hash_map<Node*, int64_t>& schedule) {
+    FunctionBase* f, const absl::flat_hash_map<Node*, int64_t>& schedule,
+    const DelayEstimator& delay_estimator) {
   InverseSchedule inverse_schedule = InvertSchedule(schedule);
   std::vector<RematOpportunity> result;
   for (Node* target : TopoSort(f)) {
-    // FIXME: skip nodes in critical path
     // We only want to rematerialize nodes if they have incoming edges from
     // previous pipeline stages.
     bool has_incoming_edges = false;
@@ -236,6 +375,7 @@ FindRematerializationOpportunities(
       }
     }
   }
+
   return result;
 }
 
@@ -245,7 +385,8 @@ double AreaOfNode(Node* node) {
 }
 
 absl::StatusOr<bool> Rematerialization(
-    FunctionBase* f, absl::flat_hash_map<Node*, int64_t>* schedule) {
+    FunctionBase* f, absl::flat_hash_map<Node*, int64_t>* schedule,
+    const DelayEstimator& delay_estimator) {
   PassOptions options;
   PassResults results;
 
@@ -290,8 +431,9 @@ absl::StatusOr<bool> Rematerialization(
 
   // Compute the set of rematerialization opportunities.
 
-  XLS_ASSIGN_OR_RETURN(std::vector<RematOpportunity> opportunities,
-                       FindRematerializationOpportunities(f, *schedule));
+  XLS_ASSIGN_OR_RETURN(
+      std::vector<RematOpportunity> opportunities,
+      FindRematerializationOpportunities(f, *schedule, delay_estimator));
 
   // Fast path to quit if no rematerialization opportunities were found.
 
@@ -320,14 +462,48 @@ absl::StatusOr<bool> Rematerialization(
       }
     }
 
-    // Update the schedule.
+    // Compute longest paths and slack so that we can prune opportunities that
+    // negatively affect the critical path.
+    XLS_ASSIGN_OR_RETURN(LongestPathLength longest,
+                         LongestNodePaths(f, delay_estimator));
+    absl::flat_hash_map<Node*, Slack> slack =
+        ComputeSlack(f, InvertSchedule(*schedule), longest);
+
+    std::vector<RematOpportunity> unpruned_opportunities;
+
     for (const RematOpportunity& opportunity : opportunities) {
       int64_t stage = schedule->at(opportunity.to_rematerialize);
-      for (Node* node :
-           ComputeDeadNodeChunk(added, opportunity.rematerialization)) {
+      absl::flat_hash_set<Node*> chunk =
+          ComputeDeadNodeChunk(added, opportunity.rematerialization);
+
+      // Compute the delay of the replacement
+      Delay replacement_delay = 0;
+      for (Node* node : chunk) {
+        replacement_delay =
+            std::max(replacement_delay,
+                     longest.at(node).at(opportunity.rematerialization));
+      }
+
+      // Determine if the replacement will lengthen the critical path through
+      // this stage. If so, skip over this opportunity.
+      Slack s = slack.at(opportunity.to_rematerialize);
+      if (replacement_delay + s.longest_path_out_of > s.stage_critical_path) {
+        XLS_VLOG(3) << "Opportunity was pruned: "
+                    << opportunity.to_rematerialize;
+        continue;
+      }
+
+      // Update the schedule.
+      for (Node* node : chunk) {
         (*schedule)[node] = stage;
       }
+
+      // This opportunity wasn't pruned, so save it
+      unpruned_opportunities.push_back(opportunity);
     }
+
+    // Remove all unpruned opportunities
+    opportunities = unpruned_opportunities;
   }
 
   // We can run CSE _once_ and it will merge together all the dead nodes

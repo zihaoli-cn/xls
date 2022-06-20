@@ -16,13 +16,15 @@
 #define XLS_PASSES_REMATERIALIZATION_PASS_H_
 
 #include "absl/status/statusor.h"
+#include "xls/delay_model/delay_estimator.h"
 #include "xls/ir/function.h"
 #include "xls/passes/passes.h"
 
 namespace xls {
 
 absl::StatusOr<bool> Rematerialization(
-    FunctionBase* function_base, absl::flat_hash_map<Node*, int64_t>* schedule);
+    FunctionBase* function_base, absl::flat_hash_map<Node*, int64_t>* schedule,
+    const DelayEstimator& delay_estimator);
 
 // class RematerializationPass : public SchedulePass {
 //  public:

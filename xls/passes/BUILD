@@ -489,6 +489,7 @@ cc_library(
         "//xls/common/logging",
         "//xls/common/status:status_macros",
         "//xls/data_structures:submodular",
+        "//xls/delay_model:delay_estimator",
         "//xls/ir",
         "//xls/ir:op",
     ],
