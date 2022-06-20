@@ -51,8 +51,9 @@ absl::Span<Node* const> GetOperandsForCse(
 
 }  // namespace
 
-absl::StatusOr<bool> RunCse(FunctionBase* f,
-                            absl::flat_hash_map<Node*, Node*>* replacements) {
+absl::StatusOr<bool> RunCse(
+    FunctionBase* f, absl::flat_hash_map<Node*, Node*>* replacements,
+    const absl::flat_hash_map<Node*, int64_t>& mergeable) {
   // To improve efficiency, bucket potentially common nodes together. The
   // bucketing is done via an int64_t hash value which is constructed from the
   // op() of the node and the uid's of the node's operands.
@@ -66,6 +67,17 @@ absl::StatusOr<bool> RunCse(FunctionBase* f,
     // If this is slow because of many literals, the Literal values could be
     // combined into the hash. As is, all literals get the same hash value.
     return hasher(values_to_hash);
+  };
+
+  // Determines whether two nodes are mergeable based on the mergeable_ member.
+  auto is_mergeable = [&](Node* x, Node* y) -> bool {
+    if (!mergeable.contains(x) && !mergeable.contains(y)) {
+      return true;
+    }
+    if (mergeable.contains(x) && mergeable.contains(y)) {
+      return mergeable.at(x) == mergeable.at(y);
+    }
+    return false;
   };
 
   bool changed = false;
@@ -89,7 +101,8 @@ absl::StatusOr<bool> RunCse(FunctionBase* f,
       std::vector<Node*> candidate_span_backing_store;
       if (node_operands_for_cse ==
               GetOperandsForCse(candidate, &candidate_span_backing_store) &&
-          node->IsDefinitelyEqualTo(candidate)) {
+          node->IsDefinitelyEqualTo(candidate) &&
+          is_mergeable(node, candidate)) {
         XLS_VLOG(3) << absl::StreamFormat(
             "Replacing %s with equivalent node %s", node->GetName(),
             candidate->GetName());

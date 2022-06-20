@@ -27,8 +27,16 @@ namespace xls {
 // to the `replacements` hash map if it is not `nullptr`. Note that for many
 // common uses of the `replacements` map, you'll want to compute the transitive
 // closure of the relation rather than using it as-is.
-absl::StatusOr<bool> RunCse(FunctionBase* f,
-                            absl::flat_hash_map<Node*, Node*>* replacements);
+//
+// The `mergeable` map is used to specify if two nodes can be commoned together.
+// If two nodes are not found in the `mergeable` map, they are assumed to be
+// mergeable. If a node is in the map and another node is not in the map, they
+// are assumed not to be mergeable. Otherwise, two nodes are mergeable if they
+// map to the same `int64_t`. The default empty map assumes that all pairs of
+// nodes are mergeable.
+absl::StatusOr<bool> RunCse(
+    FunctionBase* f, absl::flat_hash_map<Node*, Node*>* replacements,
+    const absl::flat_hash_map<Node*, int64_t>& mergeable = {});
 
 // Computes the fixed point of a strict partial order, i.e.: the relation that
 // solves the equation `F = R ∘ F` where `R` is the given strict partial order.

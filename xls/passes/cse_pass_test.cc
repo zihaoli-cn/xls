@@ -51,17 +51,16 @@ class CsePassTest : public IrTestBase {
  protected:
   CsePassTest() = default;
 
-  absl::StatusOr<bool> Run(Function* f) {
-    PassResults results;
-    XLS_ASSIGN_OR_RETURN(
-        bool changed, CsePass().RunOnFunctionBase(f, PassOptions(), &results));
-    // Run dce to clean things up.
-    XLS_RETURN_IF_ERROR(DeadCodeEliminationPass()
-                            .RunOnFunctionBase(f, PassOptions(), &results)
-                            .status());
-    // Return whether cse changed anything.
+  absl::StatusOr<bool> Run(
+      Function* f, const absl::flat_hash_map<Node*, int64_t>& mergeable = {}) {
+    XLS_ASSIGN_OR_RETURN(bool changed, RunCse(f, &replacements_, mergeable));
+    // Run DCE to clean things up.
+    XLS_RETURN_IF_ERROR(RunDce(f, false, nullptr).status());
+    // Return whether CSE changed anything.
     return changed;
   }
+
+  absl::flat_hash_map<Node*, Node*> replacements_;
 };
 
 TEST_F(CsePassTest, SingleLiteralNoChange) {
@@ -224,6 +223,36 @@ TEST_F(CsePassTest, NonCommutativeOperands) {
   EXPECT_NE(f->return_value()->operand(0), f->return_value()->operand(1));
   EXPECT_THAT(Run(f), IsOkAndHolds(false));
   EXPECT_NE(f->return_value()->operand(0), f->return_value()->operand(1));
+}
+
+TEST_F(CsePassTest, UsingMergeable) {
+  auto p = CreatePackage();
+  XLS_ASSERT_OK_AND_ASSIGN(Function * f, ParseFunction(R"(
+     fn nontrivial(x: bits[8], y: bits[8], z: bits[8]) -> bits[8] {
+        and.1: bits[8] = and(x, y)
+        neg.2: bits[8] = neg(and.1)
+        or.3: bits[8] = or(neg.2, z)
+
+        and.4: bits[8] = and(x, y)
+        neg.5: bits[8] = neg(and.4)
+        or.6: bits[8] = or(neg.5, z)
+
+        ret add.7: bits[8] = add(or.3, or.6)
+     }
+  )",
+                                                       p.get()));
+
+  absl::flat_hash_map<Node*, int64_t> mergeable{
+      {FindNode("and.1", f), 0}, {FindNode("neg.2", f), 0},
+      {FindNode("or.3", f), 1},  {FindNode("and.4", f), 0},
+      {FindNode("neg.5", f), 0}, {FindNode("or.6", f), 2},
+      {FindNode("add.7", f), 3},
+  };
+
+  EXPECT_EQ(f->node_count(), 10);
+  EXPECT_THAT(Run(f, mergeable), IsOkAndHolds(true));
+  EXPECT_EQ(replacements_.size(), 2);
+  EXPECT_EQ(f->node_count(), 8);
 }
 
 }  // namespace
