@@ -31,6 +31,7 @@
 #include "xls/data_structures/graph_contraction.h"
 #include "xls/ir/node_iterator.h"
 #include "xls/ir/node_util.h"
+#include "xls/passes/rematerialization_pass.h"
 #include "xls/scheduling/function_partition.h"
 #include "xls/scheduling/schedule_bounds.h"
 #include "ortools/linear_solver/linear_solver.h"
@@ -763,6 +764,8 @@ class DelayEstimatorWithInputDelay : public DelayEstimator {
       cycle_map[node] = bounds.lb(node);
     }
   }
+
+  XLS_RETURN_IF_ERROR(Rematerialization(f, &cycle_map).status());
 
   auto schedule = PipelineSchedule(f, cycle_map, options.pipeline_stages());
   XLS_RETURN_IF_ERROR(

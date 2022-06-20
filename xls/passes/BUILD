@@ -477,6 +477,24 @@ cc_library(
 )
 
 cc_library(
+    name = "rematerialization_pass",
+    srcs = ["rematerialization_pass.cc"],
+    hdrs = ["rematerialization_pass.h"],
+    deps = [
+        ":cse_pass",
+        ":dce_pass",
+        ":passes",
+        "@com_google_absl//absl/hash",
+        "@com_google_absl//absl/status:statusor",
+        "//xls/common/logging",
+        "//xls/common/status:status_macros",
+        "//xls/data_structures:submodular",
+        "//xls/ir",
+        "//xls/ir:op",
+    ],
+)
+
+cc_library(
     name = "strength_reduction_pass",
     srcs = ["strength_reduction_pass.cc"],
     hdrs = [

@@ -79,6 +79,7 @@ cc_library(
         "//xls/delay_model:delay_estimator",
         "//xls/ir",
         "//xls/ir:node_util",
+        "//xls/passes:rematerialization_pass",
         "@com_google_ortools//ortools/linear_solver",
     ],
 )
