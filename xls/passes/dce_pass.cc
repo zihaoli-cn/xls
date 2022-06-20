@@ -24,8 +24,8 @@
 
 namespace xls {
 
-absl::StatusOr<bool> DeadCodeEliminationPass::RunOnFunctionBaseInternal(
-    FunctionBase* f, const PassOptions& options, PassResults* results) const {
+absl::StatusOr<bool> RunDce(FunctionBase* f, bool dry_run,
+                            absl::flat_hash_set<Node*>* deleted) {
   auto is_deletable = [](Node* n) {
     return !n->function_base()->HasImplicitUse(n) &&
            !OpIsSideEffecting(n->op());
@@ -53,13 +53,23 @@ absl::StatusOr<bool> DeadCodeEliminationPass::RunOnFunctionBaseInternal(
         }
       }
     }
-    XLS_VLOG(3) << "DCE removing " << node->ToString();
-    XLS_RETURN_IF_ERROR(f->RemoveNode(node));
-    removed_count++;
+    if (!dry_run) {
+      XLS_VLOG(3) << "DCE removing " << node->ToString();
+      XLS_RETURN_IF_ERROR(f->RemoveNode(node));
+      removed_count++;
+    }
+    if (deleted != nullptr) {
+      deleted->insert(node);
+    }
   }
 
   XLS_VLOG(2) << "Removed " << removed_count << " dead nodes";
   return removed_count > 0;
+}
+
+absl::StatusOr<bool> DeadCodeEliminationPass::RunOnFunctionBaseInternal(
+    FunctionBase* f, const PassOptions& options, PassResults* results) const {
+  return RunDce(f, false, nullptr);
 }
 
 }  // namespace xls

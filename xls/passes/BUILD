@@ -433,6 +433,7 @@ cc_library(
     hdrs = ["dce_pass.h"],
     deps = [
         ":passes",
+        "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/status:statusor",
         "//xls/common/logging",
         "//xls/common/status:status_macros",

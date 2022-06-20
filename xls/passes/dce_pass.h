@@ -17,11 +17,20 @@
 #ifndef XLS_PASSES_DCE_PASS_H_
 #define XLS_PASSES_DCE_PASS_H_
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/status/statusor.h"
 #include "xls/ir/function.h"
 #include "xls/passes/passes.h"
 
 namespace xls {
+
+// This function is called by the `DeadCodeEliminationPass` to delete unused
+// subexpressions. It exists so that you can call it inside other passes and
+// extract which nodes were deleted. Each deletion done by the pass is added
+// to the `deleted` hash set if it is not `nullptr`. If `dry_run` is `true`,
+// then no nodes will actually be deleted.
+absl::StatusOr<bool> RunDce(FunctionBase* f, bool dry_run,
+                            absl::flat_hash_set<Node*>* deleted);
 
 // class DeadCodeEliminationPass iterates up from a functions result
 // nodes and marks all visited node. After that, all unvisited nodes

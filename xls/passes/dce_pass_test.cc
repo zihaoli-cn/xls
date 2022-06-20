@@ -32,11 +32,11 @@ class DeadCodeEliminationPassTest : public IrTestBase {
  protected:
   DeadCodeEliminationPassTest() = default;
 
-  absl::StatusOr<bool> Run(FunctionBase* f) {
-    PassResults results;
-    return DeadCodeEliminationPass().RunOnFunctionBase(f, PassOptions(),
-                                                       &results);
+  absl::StatusOr<bool> Run(FunctionBase* f, bool dry_run = false) {
+    return RunDce(f, dry_run, &deleted_);
   }
+
+  absl::flat_hash_set<Node*> deleted_;
 };
 
 TEST_F(DeadCodeEliminationPassTest, NoDeadCode) {
@@ -48,7 +48,11 @@ TEST_F(DeadCodeEliminationPassTest, NoDeadCode) {
   )",
                                                        p.get()));
   EXPECT_EQ(f->node_count(), 3);
+  EXPECT_THAT(Run(f, true), IsOkAndHolds(false));
+  EXPECT_EQ(deleted_.size(), 0);
+  EXPECT_EQ(f->node_count(), 3);
   EXPECT_THAT(Run(f), IsOkAndHolds(false));
+  EXPECT_EQ(deleted_.size(), 0);
   EXPECT_EQ(f->node_count(), 3);
 }
 
@@ -64,7 +68,11 @@ TEST_F(DeadCodeEliminationPassTest, SomeDeadCode) {
   )",
                                                        p.get()));
   EXPECT_EQ(f->node_count(), 6);
+  EXPECT_THAT(Run(f, true), IsOkAndHolds(false));
+  EXPECT_EQ(deleted_.size(), 2);
+  EXPECT_EQ(f->node_count(), 6);
   EXPECT_THAT(Run(f), IsOkAndHolds(true));
+  EXPECT_EQ(deleted_.size(), 2);
   EXPECT_EQ(f->node_count(), 4);
 }
 
