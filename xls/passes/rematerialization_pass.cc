@@ -203,6 +203,7 @@ absl::flat_hash_map<Node*, Slack> ComputeSlack(
 // An opportunity for rematerialization.
 // TODO(taktoa): somehow refactor this so that it talks about rematerializing
 // an edge rather than a node.
+// TODO(zihao): delete it after the refactor implementation is done
 struct RematOpportunity {
   // The node that may be rematerialized.
   Node* to_rematerialize;
@@ -236,10 +237,55 @@ struct RematOpportunity {
   }
 };
 
+// TODO(zihao): A proposed replacement for `RematOpportunity`. It talks about "edge".
+struct RematEdgeOpportunity {
+  // The crose-stage data dependence edge.
+  // "cross-stage" means "stage[edge_src] < stage[edge_dst]".
+  Node* edge_src;
+  Node* edge_dst;
+  // A dead node representing the rematerialization, which `edge_src`
+  // can be replaced with.
+  Node* rematerialization;
+  // The amount of area saved by applying this opportunity, not including the
+  // cost incurred by any nodes added.
+  double quality;
+
+  RematEdgeOpportunity(Node* src,  Node* dst, Node* replace, double q)
+   : edge_src(src), edge_dst(dst), rematerialization(replace), quality(q) {
+    XLS_CHECK(edge_dst->HasOperand(edge_src));
+  }
+
+  friend bool operator==(const RematEdgeOpportunity& lhs,
+
+                         const RematEdgeOpportunity& rhs) {
+    return (lhs.edge_src == rhs.edge_src) &&
+           (lhs.edge_dst == rhs.edge_dst) &&
+           (lhs.rematerialization == rhs.rematerialization);
+  }
+
+  friend bool operator<(const RematEdgeOpportunity& lhs,
+                        const RematEdgeOpportunity& rhs) {
+    std::tuple<Node*, Node*> lhs_tuple{lhs.edge_src, lhs.edge_dst,
+                                       lhs.rematerialization};
+    std::tuple<Node*, Node*> rhs_tuple{rhs.edge_src, rhs.edge_dst,
+                                       rhs.rematerialization};
+    return lhs_tuple < lhs_tuple;
+  }
+
+  template <typename H>
+  friend H AbslHashValue(H h, const RematEdgeOpportunity& ro) {
+    return H::combine(std::move(h), ro.edge_src, ro.edge_dst, 
+                      ro.rematerialization, ro.quality);
+  }
+};
+
 // Returns for a given dead node, the largest "contiguous" set of dead nodes
 // that feed into this node.
 // A node is within this set iff all paths starting at that node and ending
 // at the given node only touch dead nodes, and at least one such path exists.
+// corner case: 
+//   if "node" in "dead_nodes", the return set will contains "node"
+//   in this case, returning set will never be empty
 absl::flat_hash_set<Node*> ComputeDeadNodeChunk(
     const absl::flat_hash_set<Node*>& dead_nodes, Node* node) {
   std::vector<Node*> stack;
@@ -385,6 +431,87 @@ FindRematerializationOpportunities(
     }
   }
 
+  return result;
+}
+
+// TODO(zihao): replace `FindRematerializationOpportunitiesAtNode` later
+absl::StatusOr<RematEdgeOpportunity>
+FindRematerializationOpportunitiesAtEdge(
+    Node* src, Node* dst, FunctionBase* f,
+    const absl::flat_hash_map<Node*, int64_t>& schedule,
+    const InverseSchedule& inverse_schedule) {
+  int64_t dst_stage_num = schedule.at(dst);
+  absl::flat_hash_set<Node*> available;
+  for (Node* node : inverse_schedule[dst_stage_num]) {
+    available.insert(node);
+  }
+
+  // TODO: remove nodes that would make the schedule worse from `available`
+
+  absl::flat_hash_set<Node*> unavailable;
+  for(int64_t i = 0; i < dst_stage_num; ++i) {
+    for(const auto& node : inverse_schedule[i]){
+      unavailable.insert(node);
+    }
+  }
+
+  absl::flat_hash_set<Node*> chunk = ComputeDeadNodeChunk(unavailable, src);
+  XLS_CHECK(!chunk.empty());
+
+  absl::flat_hash_map<Node*, int64_t> topo_index;
+
+  {
+    std::vector<Node*> topo_sort = TopoSort(f).AsVector();
+    for (int64_t i = 0; i < topo_sort.size(); ++i) {
+      topo_index[topo_sort[i]] = i;
+    }
+  }
+
+  absl::flat_hash_map<Node*, Node*> clones;
+  std::vector<Node*> chunk_toposorted(chunk.begin(), chunk.end());
+  std::stable_sort(chunk_toposorted.begin(), chunk_toposorted.end(),
+                  [&](Node* x, Node* y) -> bool {
+                    return topo_index.at(x) < topo_index.at(y);
+                  });
+  for (Node* node : chunk_toposorted) {
+    std::vector<Node*> cloned_operands;
+    for (Node* operand : node->operands()) {
+      cloned_operands.push_back(clones.at(operand));
+    }
+    XLS_ASSIGN_OR_RETURN(clones[node], node->Clone(cloned_operands));
+  }
+  
+  double quality = (schedule.at(dst) - schedule.at(src)) *
+               src->GetType()->GetFlatBitCount();
+  
+  constexpr double area_per_flop = 10.0;
+
+  quality *= area_per_flop;
+
+  return std::vector<RematEdgeOpportunity>{
+      RematEdgeOpportunity{src, dst, clones.at(src), quality}};
+}
+
+// TODO(zihao): replace `FindRematerializationOpportunities` later
+absl::StatusOr<std::vector<RematEdgeOpportunity>>
+FindRematerializationEdgeOpportunities(
+    FunctionBase* f, const absl::flat_hash_map<Node*, int64_t>& schedule,
+    const DelayEstimator& delay_estimator) {
+  InverseSchedule inverse_schedule = InvertSchedule(schedule);
+  std::vector<RematEdgeOpportunity> result;
+  for (Node* target : TopoSort(f)) {
+    // We only want to rematerialize nodes if they have incoming edges from
+    // previous pipeline stages.
+    bool has_incoming_edges = false;
+    for (Node* source : target->operands()) {
+      if (schedule.at(source) < schedule.at(target)) {
+        XLS_ASSIGN_OR_RETURN(RematEdgeOpportunity opportunity_at_edge,
+                          FindRematerializationOpportunitiesAtEdge(
+                            source, target, f, schedule, inverse_schedule));
+        result.push_back(opportunity_at_edge);
+      }
+    }
+  }
   return result;
 }
 
