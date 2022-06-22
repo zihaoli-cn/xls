@@ -54,6 +54,8 @@ InverseSchedule InvertSchedule(
 
 using Delay = int64_t;
 
+// This data structure records the total delay along the longest path 
+// between each pair of node.
 using LongestPathLength =
     absl::flat_hash_map<Node*, absl::flat_hash_map<Node*, Delay>>;
 
@@ -117,7 +119,11 @@ absl::flat_hash_map<Node*, Slack> ComputeSlack(
 
   for (int64_t stage = 0; stage < inverse_schedule.size(); ++stage) {
     absl::flat_hash_set<Node*> stage_nodes = inverse_schedule[stage];
+    // entry_nodes's requirement:
+    //   (has no operand) OR (all operands are scheduled in previous stages)
     absl::flat_hash_set<Node*> entry_nodes;
+    // exit_nodes's requirement:
+    //   (has users) AND (all users are scheduled in following stages)
     absl::flat_hash_set<Node*> exit_nodes;
 
     for (Node* node : stage_nodes) {
@@ -134,6 +140,7 @@ absl::flat_hash_map<Node*, Slack> ComputeSlack(
       }
     }
 
+    // longest path between any pair of entry/exit
     int64_t stage_critical_length = 0;
 
     for (Node* entry : entry_nodes) {
@@ -148,6 +155,7 @@ absl::flat_hash_map<Node*, Slack> ComputeSlack(
     for (Node* node : stage_nodes) {
       bool path_exists = false;
 
+      // longest path from any stage entry node to current node
       int64_t entry_to_node_max = 0;
       for (Node* entry : entry_nodes) {
         if (longest.at(entry).contains(node)) {
@@ -157,11 +165,12 @@ absl::flat_hash_map<Node*, Slack> ComputeSlack(
         }
       }
 
+      // longest path from current node to any stage exit node
       int64_t node_to_exit_max = 0;
-      for (Node* entry : entry_nodes) {
-        if (longest.at(entry).contains(node)) {
+      for (Node* exit : exit_nodes) {
+        if (longest.at(node).contains(exit)) {
           node_to_exit_max =
-              std::max(node_to_exit_max, longest.at(entry).at(node));
+              std::max(node_to_exit_max, longest.at(node).at(exit));
           path_exists = true;
         }
       }
