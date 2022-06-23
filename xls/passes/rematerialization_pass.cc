@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
+
 #include "xls/passes/rematerialization_pass.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -19,6 +21,8 @@
 #include "absl/hash/hash.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/types/span.h"
+
 #include "xls/common/logging/logging.h"
 #include "xls/common/status/status_macros.h"
 #include "xls/data_structures/submodular.h"
@@ -934,6 +938,170 @@ absl::StatusOr<bool> RematerializationReplacement(
   }
 
   return modified;
+}
+
+// Use ValueNumbering method to find equivalence classes.
+// 
+// It is able to find more hidden common sub-expression, 
+// which may expose wider range of opportunities:
+//  1. to use near-by equivalent nodes when searching the `DeadNodeChunk`.
+//  2. Dead nodes introduced by remat opportunities in the same stage, 
+//     may have more chances to share nodes aross different chunks.
+//  3. maybe other ...
+// 
+// This implementation heavily references `cse_pass`'s. The main difference is 
+// that the hash method use operands' ValueNumber rather than node-id.
+// 
+// Although inspired by `cse_pass`, it is not proposed to replace it. 
+// It is not always beneficial to eliminate all the CSE, because it may introduce 
+// dense data dependence edges, which may have a nagetive effect on scheduling.
+// `literal_uncommoning_pass` is a good example.
+//
+// TODO(zihao): 
+//   1. somehow integrate it into the current implementation
+//   2. check that if bugs exist
+absl::StatusOr<std::vector<absl::flat_hash_set<Node*>>> 
+FindValueNumberingEquivClasses(FunctionBase* f){
+  using ValueNumber = int64_t;
+  using BitCount = int64_t;
+  // each (Op, BitCount) has its own sub-table
+  using TblKey = std::pair<Op, BitCount>;
+  // map node's ptr to node's Value Number
+  using VnTbl = absl::flat_hash_map<Node*, ValueNumber>;
+  
+  absl::flat_hash_map<TblKey, VnTbl> sub_tbls;
+
+  auto get_tbl_key = [](Node* node){
+    return std::make_pair(node->op(), node->BitCountOrDie());
+  };
+
+  auto assign_vn = [&](Node* node, ValueNumber vn){
+    sub_tbls.at(get_tbl_key(node)).at(node) = vn;
+  };
+
+  auto query_vn = [&](Node* node){
+    return sub_tbls.at(get_tbl_key(node)).at(node);
+  };
+  
+  // Initialize nodes' Value Number to "-1". Later, we will
+  // use it to check whether a node has a value number.
+  for(Node* node : f->nodes()){
+    if (OpIsSideEffecting(node->op())) {
+      continue;
+    }
+    sub_tbls[get_tbl_key(node)][node] = -1;
+  }
+
+  // Handle all the literals. Currently, only deal with Bits-Literal.
+  ValueNumber next_vn = 0;
+  {
+    absl::flat_hash_map<Bits, ValueNumber> bits_to_vn;
+    for(Node* node : f->nodes()){
+      if (node->Is<Literal>() && node->GetType()->IsBits()) {
+        const Bits& bits = node->As<Literal>()->value().bits();
+        if (!bits_to_vn.contains(bits)){
+          bits_to_vn[bits] = next_vn++;
+        }
+        assign_vn(node, bits_to_vn.at(bits));
+      }
+    }
+  }
+
+  // Handle other nodes.
+  {
+    // Returns the operands of the given node for the purposes of the
+    // ValueNumber analysis. The operands may be reordered, because 
+    // of the propery of commutative for some specific kind of op. 
+    // This lambda function heavily references `GetOperandsForCse` 
+    // function defined in `cse_pass`.
+    auto get_operands_vn = [&](Node* node, 
+        std::vector<ValueNumber>* operands_vn_store) 
+        -> absl::Span<ValueNumber> {
+      XLS_CHECK(operands_vn_store->empty());
+      if (!OpIsCommutative(node->op())) {
+        std::transform(
+          node->operands().begin(), node->operands().end(), 
+          std::back_inserter(*operands_vn_store), query_vn);
+        return absl::Span<ValueNumber>{*operands_vn_store};
+      }
+
+      // reorder operands by value number
+
+      std::vector<Node*> operands_store;
+      operands_store.insert(operands_store.begin(),
+          node->operands().begin(), node->operands().end());
+      std::sort(operands_store.begin(), operands_store.end(), 
+          [&](Node* n1, Node* n2){
+        return query_vn(n1) < query_vn(n2);
+      });
+
+      std::transform(operands_store.begin(), operands_store.end(),
+        std::back_inserter(*operands_vn_store), query_vn);
+      return absl::Span<ValueNumber>{*operands_vn_store};
+    };
+    
+    auto hasher = absl::Hash<std::vector<ValueNumber>>();
+    auto node_hash = [&](Node* n) {
+      std::vector<ValueNumber> vns_to_hash;
+      get_operands_vn(n, &vns_to_hash);
+      return hasher(vns_to_hash);
+    };
+
+
+    // The following loop is very similar to the main-loop in 
+    // `RunCse` defined in `cse_pass`.
+
+    absl::flat_hash_map<int64_t, std::vector<Node*>> node_buckets;
+    node_buckets.reserve(f->node_count());
+    for (Node* node : TopoSort(f)) {
+      if (OpIsSideEffecting(node->op())) {
+        continue;
+      }
+
+      int64_t hash = node_hash(node);
+      node_buckets[hash].push_back(node);
+
+      if (query_vn(node) != -1) {
+        // For example, Bits-Literals' value numbers are assigned.
+        continue;
+      }
+
+      // Assign value number to this node.
+
+      bool found_equiv = false;
+      if (node_buckets.contains(hash)) {
+        std::vector<ValueNumber> node_operands_vn_store;
+        absl::Span<ValueNumber> node_operands_vn = 
+            get_operands_vn(node, &node_operands_vn_store);
+        for (Node* candidate : node_buckets.at(hash)) {
+          std::vector<ValueNumber> candidate_operands_vn_store;
+          if (node_operands_vn ==
+              get_operands_vn(candidate, &candidate_operands_vn_store)) {
+            // Find an equivalent node. Assign the old value number.
+            assign_vn(node, query_vn(candidate));
+            found_equiv = true;
+            break;
+          }
+        }
+      }
+
+      if(!found_equiv){
+        // There is no equivalent node. Assign a new value number.
+        assign_vn(node, next_vn++);
+      }
+    }
+  }
+  
+  // extract result
+
+  std::vector<absl::flat_hash_set<Node*>> equiv_classes;
+  equiv_classes.resize(next_vn);
+  for (const auto& [key, tbl] : sub_tbls) {
+    for (const auto& [node, vn]: tbl){
+      equiv_classes.at(vn).insert(node);
+    }
+  }
+  return equiv_classes;
 }
 
 }  // namespace xls
