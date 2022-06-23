@@ -22,6 +22,7 @@
 #include "xls/common/logging/logging.h"
 #include "xls/common/status/status_macros.h"
 #include "xls/data_structures/submodular.h"
+#include "xls/ir/node.h"
 #include "xls/ir/node_iterator.h"
 #include "xls/ir/op.h"
 #include "xls/passes/cse_pass.h"
@@ -253,11 +254,6 @@ struct RematEdgeOpportunity {
   // cost incurred by any nodes added.
   double quality;
 
-  RematEdgeOpportunity(Node* src,  Node* dst, Node* replace, double q)
-   : edge_src(src), edge_dst(dst), rematerialization(replace), quality(q) {
-    XLS_CHECK(edge_dst->HasOperand(edge_src));
-  }
-
   friend bool operator==(const RematEdgeOpportunity& lhs,
 
                          const RematEdgeOpportunity& rhs) {
@@ -268,9 +264,9 @@ struct RematEdgeOpportunity {
 
   friend bool operator<(const RematEdgeOpportunity& lhs,
                         const RematEdgeOpportunity& rhs) {
-    std::tuple<Node*, Node*> lhs_tuple{lhs.edge_src, lhs.edge_dst,
+    std::tuple<Node*, Node*, Node*> lhs_tuple{lhs.edge_src, lhs.edge_dst,
                                        lhs.rematerialization};
-    std::tuple<Node*, Node*> rhs_tuple{rhs.edge_src, rhs.edge_dst,
+    std::tuple<Node*, Node*, Node*> rhs_tuple{rhs.edge_src, rhs.edge_dst,
                                        rhs.rematerialization};
     return lhs_tuple < lhs_tuple;
   }
@@ -360,6 +356,7 @@ FindRematerializationOpportunitiesAtNode(
   }
 
   absl::flat_hash_map<Node*, absl::flat_hash_set<Node*>> replacements;
+  absl::flat_hash_map<Node*, Node*> child_clones;
   for (Node* child : target->operands()) {
     if (schedule.at(child) < schedule.at(target)) {
       absl::flat_hash_set<Node*> chunk =
@@ -372,20 +369,20 @@ FindRematerializationOpportunitiesAtNode(
         continue;
       }
       replacements[child] = chunk;
+      XLS_ASSIGN_OR_RETURN(auto clones, CloneDeadNodeChunk(f, chunk));
+      child_clones[child] = clones.at(child);
     }
   }
 
   if (replacements.empty()) {
     return std::vector<RematOpportunity>();
   }
-
-  XLS_ASSIGN_OR_RETURN(absl::flat_hash_map<Node*, Node*> clones, CloneDeadNodeChunk(f, chunk));
   
   std::vector<Node*> cloned_target_operands;
   for (int64_t i = 0; i < target->operands().size(); ++i) {
     Node* child = target->operands()[i];
     cloned_target_operands.push_back(
-        (schedule.at(child) < schedule.at(target)) ? clones.at(child) : child);
+        (schedule.at(child) < schedule.at(target)) ? child_clones.at(child) : child);
   }
 
   XLS_ASSIGN_OR_RETURN(Node * target_replacement,
@@ -472,8 +469,7 @@ FindRematerializationOpportunitiesAtEdge(
     return absl::UnavailableError("Cannot find a proper computation chunk");
   }
 
-  XLS_ASSIGN_OR_RETURN(absl::flat_hash_map<Node*, Node*> clones, 
-                       CloneDeadNodeChunk(f, chunk));
+  XLS_ASSIGN_OR_RETURN(auto clones, CloneDeadNodeChunk(f, chunk));
 
   double quality = (schedule.at(dst) - schedule.at(src)) *
                src->GetType()->GetFlatBitCount();
@@ -482,8 +478,7 @@ FindRematerializationOpportunitiesAtEdge(
 
   quality *= area_per_flop;
 
-  return std::vector<RematEdgeOpportunity>{
-      RematEdgeOpportunity{src, dst, clones.at(src), quality}};
+  return RematEdgeOpportunity{src, dst, clones.at(src), quality};
 }
 
 // TODO(zihao): replace `FindRematerializationOpportunities` later
@@ -496,7 +491,6 @@ FindRematerializationEdgeOpportunities(
   for (Node* target : TopoSort(f)) {
     // We only want to rematerialize nodes if they have incoming edges from
     // previous pipeline stages.
-    bool has_incoming_edges = false;
     for (Node* source : target->operands()) {
       if (schedule.at(source) < schedule.at(target)) {
         XLS_ASSIGN_OR_RETURN(RematEdgeOpportunity opportunity_at_edge,
