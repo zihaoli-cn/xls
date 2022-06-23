@@ -14,7 +14,10 @@
 
 #include "xls/passes/rematerialization_pass.h"
 
+#include "absl/container/flat_hash_set.h"
+#include "absl/container/flat_hash_map.h"
 #include "absl/hash/hash.h"
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "xls/common/logging/logging.h"
 #include "xls/common/status/status_macros.h"
@@ -304,6 +307,36 @@ absl::flat_hash_set<Node*> ComputeDeadNodeChunk(
   return discovered;
 }
 
+// Helpers to clone all nodes in the chunk.
+// Traverse the computation graph by topological order.
+absl::StatusOr<absl::flat_hash_map<Node*, Node*>>
+CloneDeadNodeChunk(FunctionBase* f, const absl::flat_hash_set<Node*>& chunk){
+  // TODO(zihao): `topo_index` may be buffered to avoid recomputing
+  absl::flat_hash_map<Node*, int64_t> topo_index;
+  {
+    std::vector<Node*> topo_sort = TopoSort(f).AsVector();
+    for (int64_t i = 0; i < topo_sort.size(); ++i) {
+      topo_index[topo_sort[i]] = i;
+    }
+  }
+  
+  std::vector<Node*> chunk_toposorted(chunk.begin(), chunk.end());
+  std::stable_sort(chunk_toposorted.begin(), chunk_toposorted.end(),
+                  [&](Node* x, Node* y) -> bool {
+                    return topo_index.at(x) < topo_index.at(y);
+                  });
+  
+  absl::flat_hash_map<Node*, Node*> clones;
+  for (Node* node : chunk_toposorted) {
+    std::vector<Node*> cloned_operands;
+    for (Node* operand : node->operands()) {
+      cloned_operands.push_back(clones.at(operand));
+    }
+    XLS_ASSIGN_OR_RETURN(clones[node], node->Clone(cloned_operands));
+  }
+  return clones;
+}
+
 // Currently returns only the maximal rematerialization at the given node
 // (i.e.: the one that rematerializes _all_ incoming edges from previous
 // pipeline stages).
@@ -334,7 +367,7 @@ FindRematerializationOpportunitiesAtNode(
       // If `chunk` were empty, that would mean that `child` is available, but
       // we just checked for this in the surrounding `if` statement.
       XLS_CHECK(!chunk.empty());
-      if (std::any_of(chunk.begin(), chunk.end(),
+      if (!std::any_of(chunk.begin(), chunk.end(),
                       [](Node* node) { return node->operands().empty(); })) {
         continue;
       }
@@ -346,31 +379,8 @@ FindRematerializationOpportunitiesAtNode(
     return std::vector<RematOpportunity>();
   }
 
-  absl::flat_hash_map<Node*, int64_t> topo_index;
-
-  {
-    std::vector<Node*> topo_sort = TopoSort(f).AsVector();
-    for (int64_t i = 0; i < topo_sort.size(); ++i) {
-      topo_index[topo_sort[i]] = i;
-    }
-  }
-
-  absl::flat_hash_map<Node*, Node*> clones;
-  for (const auto& [child, chunk] : replacements) {
-    std::vector<Node*> chunk_toposorted(chunk.begin(), chunk.end());
-    std::stable_sort(chunk_toposorted.begin(), chunk_toposorted.end(),
-                     [&](Node* x, Node* y) -> bool {
-                       return topo_index.at(x) < topo_index.at(y);
-                     });
-    for (Node* node : chunk_toposorted) {
-      std::vector<Node*> cloned_operands;
-      for (Node* operand : node->operands()) {
-        cloned_operands.push_back(clones.at(operand));
-      }
-      XLS_ASSIGN_OR_RETURN(clones[node], node->Clone(cloned_operands));
-    }
-  }
-
+  XLS_ASSIGN_OR_RETURN(absl::flat_hash_map<Node*, Node*> clones, CloneDeadNodeChunk(f, chunk));
+  
   std::vector<Node*> cloned_target_operands;
   for (int64_t i = 0; i < target->operands().size(); ++i) {
     Node* child = target->operands()[i];
@@ -456,31 +466,15 @@ FindRematerializationOpportunitiesAtEdge(
   }
 
   absl::flat_hash_set<Node*> chunk = ComputeDeadNodeChunk(unavailable, src);
-  XLS_CHECK(!chunk.empty());
-
-  absl::flat_hash_map<Node*, int64_t> topo_index;
-
-  {
-    std::vector<Node*> topo_sort = TopoSort(f).AsVector();
-    for (int64_t i = 0; i < topo_sort.size(); ++i) {
-      topo_index[topo_sort[i]] = i;
-    }
+  if(chunk.empty() ||
+     !std::any_of(chunk.begin(), chunk.end(),
+                  [](Node* node) { return node->operands().empty(); })){
+    return absl::UnavailableError("Cannot find a proper computation chunk");
   }
 
-  absl::flat_hash_map<Node*, Node*> clones;
-  std::vector<Node*> chunk_toposorted(chunk.begin(), chunk.end());
-  std::stable_sort(chunk_toposorted.begin(), chunk_toposorted.end(),
-                  [&](Node* x, Node* y) -> bool {
-                    return topo_index.at(x) < topo_index.at(y);
-                  });
-  for (Node* node : chunk_toposorted) {
-    std::vector<Node*> cloned_operands;
-    for (Node* operand : node->operands()) {
-      cloned_operands.push_back(clones.at(operand));
-    }
-    XLS_ASSIGN_OR_RETURN(clones[node], node->Clone(cloned_operands));
-  }
-  
+  XLS_ASSIGN_OR_RETURN(absl::flat_hash_map<Node*, Node*> clones, 
+                       CloneDeadNodeChunk(f, chunk));
+
   double quality = (schedule.at(dst) - schedule.at(src)) *
                src->GetType()->GetFlatBitCount();
   
