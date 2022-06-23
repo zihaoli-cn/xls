@@ -720,4 +720,220 @@ absl::StatusOr<bool> Rematerialization(
   return modified;
 }
 
+// TODO(zihao): replace `Rematerialization`
+absl::StatusOr<bool> RematerializationReplacement(
+    FunctionBase* f, absl::flat_hash_map<Node*, int64_t>* schedule,
+    const DelayEstimator& delay_estimator) {
+  PassOptions options;
+  PassResults results;
+
+  bool modified = false;
+
+  // Quit early if there is only one pipeline stage.
+
+  if (NumberOfPipelineStages(*schedule) <= 1) {
+    return false;
+  }
+
+  // Ensure there are no dead nodes to begin with.
+
+  {
+    absl::flat_hash_set<Node*> deleted;
+    XLS_ASSIGN_OR_RETURN(bool pass_modified, RunDce(f, false, &deleted));
+    modified |= pass_modified;
+
+    // Update the schedule.
+    for (Node* node : deleted) {
+      schedule->erase(node);
+    }
+  }
+
+  // Ensure CSE later won't merge `to_rematerialize` nodes.
+
+  {
+    absl::flat_hash_map<Node*, Node*> replacements;
+    XLS_ASSIGN_OR_RETURN(bool pass_modified,
+                         RunCse(f, &replacements, *schedule));
+    modified |= pass_modified;
+  }
+
+  // Calculate the set of nodes before rematerialization opportunity nodes were
+  // added, so we can subtract them out later to determine which nodes were
+  // added when `FindRematerializationEdgeOpportunities` is called.
+
+  absl::flat_hash_set<Node*> original_nodes;
+  for (Node* node : TopoSort(f)) {
+    original_nodes.insert(node);
+  }
+
+  // Compute the set of rematerialization opportunities.
+
+  XLS_ASSIGN_OR_RETURN(
+      std::vector<RematEdgeOpportunity> opportunities,
+      FindRematerializationEdgeOpportunities(f, *schedule, delay_estimator));
+
+  // Fast path to quit if no rematerialization opportunities were found.
+
+  if (opportunities.empty()) {
+    return modified;
+  }
+
+  // Update the schedule with the stages of nodes added by calling
+  // `FindRematerializationEdgeOpportunities`. This is necessary so that when we
+  // call the CSE pass, we can pass in the schedule ensuring that nodes are only
+  // shared between rematerializations in the same stage.
+  //
+  // Currently we assume that any nodes added for a given rematerialization
+  // will be in the same stage as the node that is being rematerialized.
+  // This will probably change at some point, as we implement more sophisticated
+  // ways of finding opportunities.
+
+  {
+    // Nodes added when `FindRematerializationOpportunity` was called.
+    absl::flat_hash_set<Node*> added;
+
+    // If a node isn't in `original_nodes`, it must have been added.
+    for (Node* node : TopoSort(f)) {
+      if (!original_nodes.contains(node)) {
+        added.insert(node);
+      }
+    }
+
+    // Compute longest paths and slack so that we can prune opportunities that
+    // negatively affect the critical path.
+    XLS_ASSIGN_OR_RETURN(LongestPathLength longest,
+                         LongestNodePaths(f, delay_estimator));
+    absl::flat_hash_map<Node*, Slack> slack =
+        ComputeSlack(f, InvertSchedule(*schedule), longest);
+
+    std::vector<RematEdgeOpportunity> unpruned_opportunities;
+
+    for (const RematEdgeOpportunity& opportunity : opportunities) {
+      int64_t stage = schedule->at(opportunity.edge_dst);
+      absl::flat_hash_set<Node*> chunk =
+          ComputeDeadNodeChunk(added, opportunity.rematerialization);
+
+      // Compute the delay of the replacement
+      Delay replacement_delay = 0;
+      for (Node* node : chunk) {
+        replacement_delay =
+            std::max(replacement_delay,
+                     longest.at(node).at(opportunity.rematerialization));
+      }
+
+      // Determine if the replacement will lengthen the critical path through
+      // this stage. If so, skip over this opportunity.
+      Slack s = slack.at(opportunity.edge_dst);
+      if (replacement_delay + s.longest_path_out_of > s.stage_critical_path) {
+        XLS_VLOG(3) << "Opportunity was pruned: "
+                    << opportunity.edge_src << "->"
+                    << opportunity.edge_dst;
+        continue;
+      }
+
+      // Update the schedule.
+      for (Node* node : chunk) {
+        (*schedule)[node] = stage;
+      }
+
+      // This opportunity wasn't pruned, so save it
+      unpruned_opportunities.push_back(opportunity);
+    }
+
+    // Remove all unpruned opportunities
+    opportunities = unpruned_opportunities;
+  }
+
+  // We can run CSE _once_ and it will merge together all the dead nodes
+  // created for the rematerialization opportunities, and then we can later use
+  // `ComputeDeadNodeChunk` to find the nodes that actually end up getting added
+  // for a given subset of the opportunities.
+
+  {
+    absl::flat_hash_map<Node*, Node*> replacements;
+    XLS_ASSIGN_OR_RETURN(bool pass_modified,
+                         RunCse(f, &replacements, *schedule));
+    modified |= pass_modified;
+    // If CSE merged together two `opportunity.rematerialization`, rewrite them
+    // to the merged node.
+    for (RematEdgeOpportunity& opportunity : opportunities) {
+      if (replacements.contains(opportunity.rematerialization)) {
+        opportunity.rematerialization =
+            replacements.at(opportunity.rematerialization);
+      }
+    }
+  }
+
+  // Compute the set of dead nodes for use in `ComputeDeadNodeChunk`.
+
+  absl::flat_hash_set<Node*> dead;
+  XLS_RETURN_IF_ERROR(RunDce(f, true, &dead).status());
+
+  // Define the submodular cost function.
+
+  SubmodularFunction<RematEdgeOpportunity> objective(
+      /*universe=*/absl::btree_set<RematEdgeOpportunity>(opportunities.begin(),
+                                                     opportunities.end()),
+      /*function=*/
+      [&](const absl::btree_set<RematEdgeOpportunity>& chosen) -> double {
+        // Compute the set of nodes added by all of the chosen opportunities.
+        absl::flat_hash_set<Node*> added_nodes;
+        for (const RematEdgeOpportunity& opportunity : chosen) {
+          for (Node* added_node :
+               ComputeDeadNodeChunk(dead, opportunity.rematerialization)) {
+            added_nodes.insert(added_node);
+          }
+        }
+
+        // Add the area of all the added nodes to the result.
+        double result = 0.0;
+        for (Node* added_node : added_nodes) {
+          result += AreaOfNode(added_node);
+        }
+
+        // Subtract the quality of all the chosen opportunities from the result.
+        for (const RematEdgeOpportunity& opportunity : chosen) {
+          result -= opportunity.quality;
+        }
+
+        return result;
+      });
+
+  // Minimize the submodular cost function.
+
+  MinimizeOptions minimize_options{MinimizeMode::Alternating, std::nullopt,
+                                   100};
+  absl::btree_set<RematEdgeOpportunity> chosen =
+      objective.ApproxMinimize(minimize_options);
+
+  // For any selected rematerialization opportunity, apply it by replacing uses
+  // of the node with its rematerialization.
+
+  for (const RematEdgeOpportunity& opportunity : chosen) {
+    XLS_VLOG(3) << "Applying rematerialization opportunity:\n"
+                << "  edge = (" << opportunity.edge_src
+                << ", " << opportunity.edge_dst << ")\n"
+                << "  qual = " << opportunity.quality << "\n";
+
+    XLS_CHECK(opportunity.edge_dst->ReplaceOperand(
+      opportunity.edge_src,
+      opportunity.rematerialization));
+  }
+
+  // Delete any rematerialization opportunity nodes that were not chosen.
+
+  {
+    absl::flat_hash_set<Node*> deleted;
+    XLS_ASSIGN_OR_RETURN(bool pass_modified, RunDce(f, false, &deleted));
+    modified |= pass_modified;
+
+    // Update the schedule.
+    for (Node* node : deleted) {
+      schedule->erase(node);
+    }
+  }
+
+  return modified;
+}
+
 }  // namespace xls
