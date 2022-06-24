@@ -246,6 +246,10 @@ struct RematOpportunity {
 };
 
 // TODO(zihao): A proposed replacement for `RematOpportunity`. It talks about "edge".
+// TODO(zihao): further refactor this, edges may share the same src.
+//    for example, supposing that dst1 and dst2 are in the same stage, 
+//    "src -> dst1" and "src -> dst2" are cross-stage data dependence stage,
+//    should consider the two edges as a single opportunity.
 struct RematEdgeOpportunity {
   // The crose-stage data dependence edge.
   // "cross-stage" means "stage[edge_src] < stage[edge_dst]".
