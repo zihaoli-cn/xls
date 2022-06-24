@@ -964,27 +964,16 @@ absl::StatusOr<bool> RematerializationReplacement(
 // TODO(zihao): 
 //   1. somehow integrate it into the current implementation
 //   2. check that if bugs exist
-absl::StatusOr<std::vector<absl::flat_hash_set<Node*>>> 
+absl::StatusOr<absl::flat_hash_map<Node*, int64_t>>
 FindValueNumberingEquivClasses(FunctionBase* f){
-  using ValueNumber = int64_t;
-  using BitCount = int64_t;
-  // each (Op, BitCount) has its own sub-table
-  using TblKey = std::pair<Op, BitCount>;
-  // map node's ptr to node's Value Number
-  using VnTbl = absl::flat_hash_map<Node*, ValueNumber>;
-  
-  absl::flat_hash_map<TblKey, VnTbl> sub_tbls;
+  absl::flat_hash_map<Node*, int64_t> vn_tbl;
 
-  auto get_tbl_key = [](Node* node){
-    return std::make_pair(node->op(), node->BitCountOrDie());
-  };
-
-  auto assign_vn = [&](Node* node, ValueNumber vn){
-    sub_tbls.at(get_tbl_key(node)).at(node) = vn;
+  auto assign_vn = [&](Node* node, int64_t vn){
+    vn_tbl[node] = vn;
   };
 
   auto query_vn = [&](Node* node){
-    return sub_tbls.at(get_tbl_key(node)).at(node);
+    return vn_tbl.at(node);
   };
   
   // Initialize nodes' Value Number to "-1". Later, we will
@@ -993,40 +982,29 @@ FindValueNumberingEquivClasses(FunctionBase* f){
     if (OpIsSideEffecting(node->op())) {
       continue;
     }
-    sub_tbls[get_tbl_key(node)][node] = -1;
+    vn_tbl[node] = -1;
   }
 
-  // Handle all the literals. Currently, only deal with Bits-Literal.
-  ValueNumber next_vn = 0;
-  {
-    absl::flat_hash_map<Bits, ValueNumber> bits_to_vn;
-    for(Node* node : f->nodes()){
-      if (node->Is<Literal>() && node->GetType()->IsBits()) {
-        const Bits& bits = node->As<Literal>()->value().bits();
-        if (!bits_to_vn.contains(bits)){
-          bits_to_vn[bits] = next_vn++;
-        }
-        assign_vn(node, bits_to_vn.at(bits));
-      }
-    }
-  }
+  int64_t next_vn = 0;
 
   // Handle other nodes.
   {
     // Returns the operands of the given node for the purposes of the
-    // ValueNumber analysis. The operands may be reordered, because 
+    // int64_t analysis. The operands may be reordered, because 
     // of the propery of commutative for some specific kind of op. 
     // This lambda function heavily references `GetOperandsForCse` 
     // function defined in `cse_pass`.
-    auto get_operands_vn = [&](Node* node, 
-        std::vector<ValueNumber>* operands_vn_store) 
-        -> absl::Span<ValueNumber> {
+    auto get_hash_elements = [&](Node* node, 
+        std::vector<int64_t>* operands_vn_store) 
+        -> absl::Span<int64_t> {
       XLS_CHECK(operands_vn_store->empty());
+      operands_vn_store->push_back(static_cast<int64_t>(node->op()));
+      operands_vn_store->push_back(node->BitCountOrDie());
       if (!OpIsCommutative(node->op())) {
         std::transform(
           node->operands().begin(), node->operands().end(), 
           std::back_inserter(*operands_vn_store), query_vn);
-        return absl::Span<ValueNumber>{*operands_vn_store};
+        return absl::Span<int64_t>{*operands_vn_store};
       }
 
       // reorder operands by value number
@@ -1041,16 +1019,15 @@ FindValueNumberingEquivClasses(FunctionBase* f){
 
       std::transform(operands_store.begin(), operands_store.end(),
         std::back_inserter(*operands_vn_store), query_vn);
-      return absl::Span<ValueNumber>{*operands_vn_store};
+      return absl::Span<int64_t>{*operands_vn_store};
     };
     
-    auto hasher = absl::Hash<std::vector<ValueNumber>>();
+    auto hasher = absl::Hash<std::vector<int64_t>>();
     auto node_hash = [&](Node* n) {
-      std::vector<ValueNumber> vns_to_hash;
-      get_operands_vn(n, &vns_to_hash);
-      return hasher(vns_to_hash);
+      std::vector<int64_t> values_to_hash;
+      get_hash_elements(n, &values_to_hash);
+      return hasher(values_to_hash);
     };
-
 
     // The following loop is very similar to the main-loop in 
     // `RunCse` defined in `cse_pass`.
@@ -1065,22 +1042,21 @@ FindValueNumberingEquivClasses(FunctionBase* f){
       int64_t hash = node_hash(node);
       node_buckets[hash].push_back(node);
 
-      if (query_vn(node) != -1) {
-        // For example, Bits-Literals' value numbers are assigned.
-        continue;
-      }
+      XLS_CHECK(query_vn(node) == -1);
 
       // Assign value number to this node.
 
       bool found_equiv = false;
+
       if (node_buckets.contains(hash)) {
-        std::vector<ValueNumber> node_operands_vn_store;
-        absl::Span<ValueNumber> node_operands_vn = 
-            get_operands_vn(node, &node_operands_vn_store);
+        std::vector<int64_t> node_span_backing_store;
+        absl::Span<int64_t> node_hash_elems = 
+            get_hash_elements(node, &node_span_backing_store);
         for (Node* candidate : node_buckets.at(hash)) {
-          std::vector<ValueNumber> candidate_operands_vn_store;
-          if (node_operands_vn ==
-              get_operands_vn(candidate, &candidate_operands_vn_store)) {
+          std::vector<int64_t> candidate_span_backing_store;
+          if (node_hash_elems ==
+                  get_hash_elements(candidate, &candidate_span_backing_store) && 
+              node->IsDefinitelyEqualTo(candidate)) {
             // Find an equivalent node. Assign the old value number.
             assign_vn(node, query_vn(candidate));
             found_equiv = true;
@@ -1095,17 +1071,7 @@ FindValueNumberingEquivClasses(FunctionBase* f){
       }
     }
   }
-  
-  // extract result
-
-  std::vector<absl::flat_hash_set<Node*>> equiv_classes;
-  equiv_classes.resize(next_vn);
-  for (const auto& [key, tbl] : sub_tbls) {
-    for (const auto& [node, vn]: tbl){
-      equiv_classes.at(vn).insert(node);
-    }
-  }
-  return equiv_classes;
+  return vn_tbl;
 }
 
 }  // namespace xls
