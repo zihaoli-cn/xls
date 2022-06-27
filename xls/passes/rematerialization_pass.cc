@@ -311,6 +311,51 @@ absl::flat_hash_set<Node*> ComputeDeadNodeChunk(
   return discovered;
 }
 
+// Compute the reduced pipeline stage number by doing remat on edge "src -> dst".
+// The result is determined by the `dst`'s "earlier sibling". Here is an example 
+// to illustrate the idea.
+// 
+// Hypothesis:
+//   - node `s` defined in stage `x`;
+//   - `s` has 2 cross-stage users, `d1`, `d2`;
+//   - users' stage numbers are all different: `y1`, `y2`
+//   - Total area: Area(chunk(s) + d1 + d2) + lambda * (y2 - x) * BitCount(s)
+// Discussion about remat's effect:
+//   - only do remat on edge "x -> d1":
+//     - save (y1 - x) * BitCount(s)
+//     - d2 can reuse `x`'s remat in stage y1, total Area will be:
+//       - Area(2 * chunk(s) + d1 + d2) + lambda * (y2 - y1) * BitCount(s)
+//   - only do remat on edge "x -> d2":
+//     - save (y2 - y1) * BitCount(s)
+//     - d1 still has to load value from registers, total Area will be:
+//       - Area(2 * chunk(s) + d1 + d2) + lambda * (y1 - x) * BitCount(s)
+int64_t RematReducedStageNumber(Node* src, Node* dst, 
+    const absl::flat_hash_map<Node*, int64_t>& schedule) {
+  XLS_CHECK(src->HasUser(dst));
+
+  // sort users by decending scheduling stage nubmer
+
+  std::vector<Node*> users_ordered;
+  users_ordered.insert(users_ordered.begin(), 
+      src->users().begin(), src->users().end());
+  std::sort(users_ordered.begin(), users_ordered.end(), [&](Node* n1, Node* n2){
+    return schedule.at(n1) > schedule.at(n2);
+  });
+
+  // find the user whose stage-number is just early than `dst`'s 
+
+  int64_t dst_stage = schedule.at(dst);
+  auto it = std::find_if(users_ordered.begin(), users_ordered.end(), 
+      [&](Node* node) {
+    return schedule.at(node) < dst_stage;
+  });
+
+  int64_t src_stage = schedule.at(src);
+  return it == users_ordered.end() ? 
+      src_stage - dst_stage /* no earlier sibling */:
+      schedule.at(*it) - dst_stage /* has earlier user */;
+}
+
 // Helpers to clone all nodes in the chunk.
 // Traverse the computation graph by topological order.
 absl::StatusOr<absl::flat_hash_map<Node*, Node*>>
@@ -399,8 +444,8 @@ FindRematerializationOpportunitiesAtNode(
   double quality = 0.0;
 
   for (Node* child : target->operands()) {
-    quality += (schedule.at(target) - schedule.at(child)) *
-               child->GetType()->GetFlatBitCount();
+    quality += RematReducedStageNumber(child, target, schedule) * 
+        child->GetType()->GetFlatBitCount();
   }
 
   constexpr double area_per_flop = 10.0;
@@ -479,9 +524,9 @@ FindRematerializationOpportunitiesAtEdge(
 
   XLS_ASSIGN_OR_RETURN(auto clones, CloneDeadNodeChunk(f, chunk));
 
-  double quality = (schedule.at(dst) - schedule.at(src)) *
-               src->GetType()->GetFlatBitCount();
-  
+  double quality = RematReducedStageNumber(src, dst, schedule) * 
+      src->GetType()->GetFlatBitCount();
+
   constexpr double area_per_flop = 10.0;
 
   quality *= area_per_flop;
@@ -964,6 +1009,11 @@ absl::StatusOr<bool> RematerializationReplacement(
 // TODO(zihao): 
 //   1. somehow integrate it into the current implementation
 //   2. check that if bugs exist
+// Comment(zihao): 
+//   It seems that this function has the equal ability with "cse_pass" to 
+//   find equivalence value. The only difference is that "cse_pass" will 
+//   merge all subexprs, while this function only FINDs the equivalence. 
+//   I am not sure whether it is still useful.
 absl::StatusOr<absl::flat_hash_map<Node*, int64_t>>
 FindValueNumberingEquivClasses(FunctionBase* f){
   absl::flat_hash_map<Node*, int64_t> vn_tbl;
