@@ -21,6 +21,7 @@
 #include "absl/hash/hash.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/types/optional.h"
 #include "absl/types/span.h"
 
 #include "xls/common/logging/logging.h"
@@ -246,17 +247,13 @@ struct RematOpportunity {
 };
 
 // TODO(zihao): A proposed replacement for `RematOpportunity`. It talks about "edge".
-// TODO(zihao): further refactor this, edges may share the same src.
-//    for example, supposing that dst1 and dst2 are in the same stage, 
-//    "src -> dst1" and "src -> dst2" are cross-stage data dependence stage,
-//    should consider the two edges as a single opportunity.
 struct RematEdgeOpportunity {
   // The crose-stage data dependence edge.
   // "cross-stage" means "stage[edge_src] < stage[edge_dst]".
   Node* edge_src;
   Node* edge_dst;
-  // A dead node representing the rematerialization, which `edge_src`
-  // can be replaced with.
+  // A dead node representing the rematerialization, which 
+  // the USE of `edge_src` can be replaced with.
   Node* rematerialization;
   // The amount of area saved by applying this opportunity, not including the
   // cost incurred by any nodes added.
@@ -386,6 +383,27 @@ CloneDeadNodeChunk(FunctionBase* f, const absl::flat_hash_set<Node*>& chunk){
   return clones;
 }
 
+// Available value, i.e., still stored in the input register.
+// A value is available at stage `k` if it is defined in stage `a`
+// and its last use is in stage `b` and a ≤ k ≤ b.
+absl::flat_hash_set<Node*> AvaiableNodesAtStage(FunctionBase* f,
+    const absl::flat_hash_map<Node*, int64_t>& schedule, int64_t stage) {
+  absl::flat_hash_set<Node*> available;
+  for (Node* node: f->nodes()) {
+    // [start, end] is `node`'s live range
+    int64_t start = schedule.at(node);
+    int64_t end = start;
+    for (Node* user : node->users()) {
+      end = std::max(end, schedule.at(user));
+    }
+
+    if (start <= stage && stage <= end) {
+      available.insert(node);
+    }
+  }
+  return available;
+}
+
 // Currently returns only the maximal rematerialization at the given node
 // (i.e.: the one that rematerializes _all_ incoming edges from previous
 // pipeline stages).
@@ -394,10 +412,7 @@ FindRematerializationOpportunitiesAtNode(
     Node* target, FunctionBase* f,
     const absl::flat_hash_map<Node*, int64_t>& schedule,
     const InverseSchedule& inverse_schedule) {
-  absl::flat_hash_set<Node*> available;
-  for (Node* node : inverse_schedule[schedule.at(target)]) {
-    available.insert(node);
-  }
+  absl::flat_hash_set<Node*> available = AvaiableNodesAtStage(f, schedule, schedule.at(target));
 
   // TODO: remove nodes that would make the schedule worse from `available`
 
@@ -417,8 +432,10 @@ FindRematerializationOpportunitiesAtNode(
       // If `chunk` were empty, that would mean that `child` is available, but
       // we just checked for this in the surrounding `if` statement.
       XLS_CHECK(!chunk.empty());
-      if (!std::any_of(chunk.begin(), chunk.end(),
+      if (std::any_of(chunk.begin(), chunk.end(),
                       [](Node* node) { return node->operands().empty(); })) {
+        // TODO: later consider not clone the entire chunk. Maybe use a min-cut, 
+        // which is related to the 3rd recompute method in the issue.
         continue;
       }
       replacements[child] = chunk;
@@ -495,16 +512,13 @@ FindRematerializationOpportunities(
 }
 
 // TODO(zihao): replace `FindRematerializationOpportunitiesAtNode` later
-absl::StatusOr<RematEdgeOpportunity>
+absl::StatusOr<absl::optional<RematEdgeOpportunity>>
 FindRematerializationOpportunitiesAtEdge(
     Node* src, Node* dst, FunctionBase* f,
     const absl::flat_hash_map<Node*, int64_t>& schedule,
     const InverseSchedule& inverse_schedule) {
   int64_t dst_stage_num = schedule.at(dst);
-  absl::flat_hash_set<Node*> available;
-  for (Node* node : inverse_schedule[dst_stage_num]) {
-    available.insert(node);
-  }
+  absl::flat_hash_set<Node*> available = AvaiableNodesAtStage(f, schedule, dst_stage_num);
 
   // TODO: remove nodes that would make the schedule worse from `available`
 
@@ -517,9 +531,11 @@ FindRematerializationOpportunitiesAtEdge(
 
   absl::flat_hash_set<Node*> chunk = ComputeDeadNodeChunk(unavailable, src);
   if(chunk.empty() ||
-     !std::any_of(chunk.begin(), chunk.end(),
+     std::any_of(chunk.begin(), chunk.end(),
                   [](Node* node) { return node->operands().empty(); })){
-    return absl::UnavailableError("Cannot find a proper computation chunk");
+    // TODO: later consider not clone the entire chunk. Maybe use a min-cut, 
+    // which is related to the 3rd recompute method in the issue.
+    return absl::nullopt;
   }
 
   XLS_ASSIGN_OR_RETURN(auto clones, CloneDeadNodeChunk(f, chunk));
@@ -546,10 +562,12 @@ FindRematerializationEdgeOpportunities(
     // previous pipeline stages.
     for (Node* source : target->operands()) {
       if (schedule.at(source) < schedule.at(target)) {
-        XLS_ASSIGN_OR_RETURN(RematEdgeOpportunity opportunity_at_edge,
+        XLS_ASSIGN_OR_RETURN(absl::optional<RematEdgeOpportunity> opportunity_at_edge,
                           FindRematerializationOpportunitiesAtEdge(
                             source, target, f, schedule, inverse_schedule));
-        result.push_back(opportunity_at_edge);
+        if (opportunity_at_edge.has_value()) { 
+          result.push_back(opportunity_at_edge.value());
+        }
       }
     }
   }
@@ -1006,9 +1024,13 @@ absl::StatusOr<bool> RematerializationReplacement(
 // dense data dependence edges, which may have a nagetive effect on scheduling.
 // `literal_uncommoning_pass` is a good example.
 //
-// TODO(zihao): 
-//   1. somehow integrate it into the current implementation
-//   2. check that if bugs exist
+// TODO: 
+//   - just as a placeholder, `dry_run` on cse_pass will save a lot of code
+//   - A possible opportunity, may not be useful:
+//     - First, find all the equivalence class.
+//     - Traverse each cross-stage DU edge. If the defined value has an equivalence 
+//       value in later stage, this USE can be replaced to the later one. It can 
+//       reduce register pressure.
 // Comment(zihao): 
 //   It seems that this function has the equal ability with "cse_pass" to 
 //   find equivalence value. The only difference is that "cse_pass" will 
