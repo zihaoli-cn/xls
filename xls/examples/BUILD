@@ -397,6 +397,11 @@ synthesize_rtl(
     ],
 )
 
+xls_dslx_test(
+    name = "quantized_cnn_test",
+    srcs = ["quantized_cnn.x"],
+)
+
 # TODO(cdleary): 2022-05-09 Get this target working as well, requires
 # addressing the dependence on openmp runtime.
 # place_and_route(
