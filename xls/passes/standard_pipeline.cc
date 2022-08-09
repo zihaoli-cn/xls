@@ -34,6 +34,7 @@
 #include "xls/passes/dfe_pass.h"
 #include "xls/passes/identity_removal_pass.h"
 #include "xls/passes/inlining_pass.h"
+#include "xls/passes/stepwise_inlining_pass.h"
 #include "xls/passes/literal_uncommoning_pass.h"
 #include "xls/passes/map_inlining_pass.h"
 #include "xls/passes/mutual_exclusion_pass.h"
@@ -170,6 +171,71 @@ std::unique_ptr<CompoundPass> CreateStandardPassPipeline(int64_t opt_level) {
 
   top->Add<LiteralUncommoningPass>();
   top->Add<DeadFunctionEliminationPass>();
+  return top;
+}
+
+class StepwiseInlineAndSimplify : public FixedPointCompoundPass {
+ public:
+  explicit StepwiseInlineAndSimplify(int64_t opt_level)
+      : FixedPointCompoundPass("step_inline_sim", "StepwiseInlineAndSimplify") {
+    Add<StepwiseInliningPass>();
+    Add<DeadFunctionEliminationPass>();
+    Add<IdentityRemovalPass>();
+    Add<ConstantFoldingPass>();
+    Add<DeadCodeEliminationPass>();
+    Add<CanonicalizationPass>();
+    Add<DeadCodeEliminationPass>();
+    Add<ArithSimplificationPass>(opt_level);
+    Add<DeadCodeEliminationPass>();
+    //Add<ComparisonSimplificationPass>();
+    //Add<DeadCodeEliminationPass>();
+    //Add<TableSwitchPass>();
+    //Add<DeadCodeEliminationPass>();
+    //Add<SelectSimplificationPass>(opt_level);
+    //Add<DeadCodeEliminationPass>();
+    //Add<ConditionalSpecializationPass>(/*use_bdd=*/false);
+    Add<DeadCodeEliminationPass>();
+    Add<ReassociationPass>();
+    Add<DeadCodeEliminationPass>();
+    Add<ConstantFoldingPass>();
+    Add<DeadCodeEliminationPass>();
+    Add<BitSliceSimplificationPass>(opt_level);
+    Add<DeadCodeEliminationPass>();
+    Add<ConcatSimplificationPass>(opt_level);
+    Add<DeadCodeEliminationPass>();
+    Add<TupleSimplificationPass>();
+    Add<DeadCodeEliminationPass>();
+    //Add<StrengthReductionPass>(opt_level);
+    //Add<DeadCodeEliminationPass>();
+    Add<ArraySimplificationPass>(opt_level);
+    Add<DeadCodeEliminationPass>();
+    //Add<NarrowingPass>(/*use_range_analysis=*/false, opt_level);
+    //Add<DeadCodeEliminationPass>();
+    Add<ArithSimplificationPass>(opt_level);
+    Add<DeadCodeEliminationPass>();
+    //Add<BooleanSimplificationPass>();
+    //Add<DeadCodeEliminationPass>();
+    Add<CsePass>();
+  }
+};
+
+std::unique_ptr<CompoundPass> CreateStandardPassPipelineForLargeFile(int64_t opt_level) {
+  auto top = std::make_unique<CompoundPass>("ir", "Top level pass pipeline");
+  //top->AddInvariantChecker<VerifierChecker>();
+  top->Add<DeadCodeEliminationPass>();
+  // At this stage in the pipeline only optimizations up to level 2 should
+  // run. 'opt_level' is the maximum level of optimization which should be run
+  // in the entire pipeline so set the level of the simplification pass to the
+  // minimum of the two values. Same below.
+  top->Add<UnrollPass>();
+  top->Add<MapInliningPass>();
+  top->Add<StepwiseInlineAndSimplify>(1);
+  return top;
+}
+
+std::unique_ptr<CompoundPass> CreateSimplificationPipeline(int64_t opt_level) {
+  auto top = std::make_unique<CompoundPass>("ir", "Top level pass pipeline");
+  top->Add<SimplificationPass>(std::min(int64_t{3}, opt_level));
   return top;
 }
 

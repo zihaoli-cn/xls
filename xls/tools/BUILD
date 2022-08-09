@@ -704,6 +704,42 @@ cc_binary(
     ],
 )
 
+cc_binary(
+    name = "opt_main_for_large",
+    srcs = ["opt_main_for_large.cc"],
+    visibility = ["//xls:xls_users"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings:str_format",
+        "//xls/common:init_xls",
+        "//xls/common/file:filesystem",
+        "//xls/common/logging",
+        "//xls/common/status:status_macros",
+        "//xls/ir",
+        "//xls/ir:ir_parser",
+        "//xls/passes",
+        "//xls/passes:standard_pipeline",
+    ],
+)
+
+cc_binary(
+    name = "opt_main_only_simplify",
+    srcs = ["opt_main_only_simplify.cc"],
+    visibility = ["//xls:xls_users"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings:str_format",
+        "//xls/common:init_xls",
+        "//xls/common/file:filesystem",
+        "//xls/common/logging",
+        "//xls/common/status:status_macros",
+        "//xls/ir",
+        "//xls/ir:ir_parser",
+        "//xls/passes",
+        "//xls/passes:standard_pipeline",
+    ],
+)
+
 py_test(
     name = "opt_main_test",
     srcs = ["opt_main_test.py"],

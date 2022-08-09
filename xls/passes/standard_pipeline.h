@@ -25,6 +25,12 @@ namespace xls {
 std::unique_ptr<CompoundPass> CreateStandardPassPipeline(
     int64_t opt_level = kMaxOptLevel);
 
+std::unique_ptr<CompoundPass> CreateStandardPassPipelineForLargeFile(
+    int64_t opt_level = kMaxOptLevel);
+
+std::unique_ptr<CompoundPass> CreateSimplificationPipeline(
+    int64_t opt_level = kMaxOptLevel);
+
 // Creates and runs the standard pipeline on the given package with default
 // options.
 absl::StatusOr<bool> RunStandardPassPipeline(Package* package,

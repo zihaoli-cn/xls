@@ -40,6 +40,7 @@ cc_library(
         ":dfe_pass",
         ":identity_removal_pass",
         ":inlining_pass",
+        ":stepwise_inlining_pass",
         ":literal_uncommoning_pass",
         ":map_inlining_pass",
         ":mutual_exclusion_pass",
@@ -202,6 +203,21 @@ cc_library(
     name = "inlining_pass",
     srcs = ["inlining_pass.cc"],
     hdrs = ["inlining_pass.h"],
+    deps = [
+        ":passes",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "//xls/common/status:status_macros",
+        "//xls/ir",
+    ],
+)
+
+
+cc_library(
+    name = "stepwise_inlining_pass",
+    srcs = ["stepwise_inlining_pass.cc"],
+    hdrs = ["stepwise_inlining_pass.h"],
     deps = [
         ":passes",
         "@com_google_absl//absl/status",

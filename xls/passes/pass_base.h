@@ -316,6 +316,7 @@ absl::StatusOr<bool> CompoundPassBase<IrT, OptionsT, ResultsT>::RunNested(
       absl::StrCat("start of compound pass '", this->long_name(), "'")));
 
   bool changed = false;
+  bool must_stop = false;
   for (const auto& pass : passes_) {
     XLS_VLOG(1) << absl::StreamFormat("Running %s (%s) pass on package %s",
                                       pass->long_name(), pass->short_name(),
@@ -353,6 +354,10 @@ absl::StatusOr<bool> CompoundPassBase<IrT, OptionsT, ResultsT>::RunNested(
                ->RunNested(ir, options, results, top_level_name, checkers)));
     } else {
       XLS_ASSIGN_OR_RETURN(pass_changed, pass->Run(ir, options, results));
+      if(pass->short_name() == "step_inlining" && pass_changed == false) {
+        XLS_VLOG(1) << absl::StreamFormat("Cannot continue to inline");
+        must_stop = true;
+      }
     }
     absl::Duration duration = absl::Now() - start;
 #ifdef DEBUG
@@ -397,6 +402,10 @@ absl::StatusOr<bool> CompoundPassBase<IrT, OptionsT, ResultsT>::RunNested(
 
     XLS_VLOG(5) << "After " << pass->long_name() << ":";
     XLS_VLOG_LINES(5, ir->DumpIr());
+
+    if(must_stop == true) {
+      return false;
+    }
   }
   return changed;
 }
