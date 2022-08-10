@@ -410,6 +410,67 @@ absl::StatusOr<bool> MatchArithPatterns(int64_t opt_level, Node* n) {
     return true;
   }
 
+  // Pattern: Mul by a literal
+  if ((n->op() == Op::kSMul || n->op() == Op::kUMul) &&
+      n->operand(1)->Is<Literal>()) {
+    const Bits& rhs = n->operand(1)->As<Literal>()->value().bits();
+
+    // If has negative literal, convert them using the following pattern:
+    //    x * (-a) => (-x) * a
+    Node* operand0 = n->operand(0);
+    Bits literal = rhs;
+    if (n->op() == Op::kSMul && bits_ops::SLessThan(rhs, 0)) {
+      XLS_ASSIGN_OR_RETURN(operand0, 
+          n->function_base()->MakeNode<UnOp>(
+            operand0->loc(), operand0, Op::kNeg));
+      literal = bits_ops::Negate(rhs);
+    }
+    
+    XLS_VLOG(2) << "FOUND: Mul by a literal => shifts and adds";
+    // Extend/trunc operand 0 (the non-literal operand) to the width of the
+    // div/mul then shift by a constant amount.
+    XLS_ASSIGN_OR_RETURN(
+        Node * adjusted_lhs,
+        maybe_extend_or_trunc(operand0, n->BitCountOrDie(), 
+                              n->op() == Op::kSMul));
+    
+    // Save all the shift operations.
+    std::vector<BinOp*> shift_nodes;
+    for (int64_t idx = 0; idx < literal.bit_count(); ++idx) {
+      if (literal.Get(idx)) {
+        XLS_ASSIGN_OR_RETURN(Node* shift_amount,
+                              n->function_base()->MakeNode<Literal>(
+                                  n->loc(), Value(UBits(idx,
+                                                      literal.bit_count()))));
+
+        XLS_ASSIGN_OR_RETURN(BinOp* shift_result, 
+                  n->function_base()->MakeNode<BinOp>(n->loc(), 
+                            adjusted_lhs, shift_amount, Op::kShll));
+        // Note: since `Logical shift by a constant` can be replaced by a slice
+        // and concat, the inserted shift operation will be replaced in the next
+        // iteration by that pattern.
+        shift_nodes.push_back(shift_result);
+      }
+    }
+    
+    // Generated more than one shift operations.
+    if (shift_nodes.size() > 1) {
+      // Create an addition chain from shift operations.
+      // It hasn't been implemented to be balanced because 
+      // the later `ReassociationPass` can handle it. 
+      Node* acc = shift_nodes[0];
+      for (int64_t idx = 1; idx < shift_nodes.size(); ++idx) {
+        XLS_ASSIGN_OR_RETURN(acc,
+                n->function_base()->MakeNode<BinOp>(
+                      n->loc(), acc, shift_nodes.at(idx), Op::kAdd));
+      }
+      XLS_RETURN_IF_ERROR(n->ReplaceUsesWith(acc));
+
+      std::cout << acc->function_base()->DumpIr() << std::endl;
+      return true;
+    }
+  }
+
   // Pattern: UMod by a power of two.
   if ((n->op() == Op::kUMod) && n->operand(1)->Is<Literal>()) {
     const Bits& rhs = n->operand(1)->As<Literal>()->value().bits();
