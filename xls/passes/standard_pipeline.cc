@@ -174,18 +174,18 @@ std::unique_ptr<CompoundPass> CreateStandardPassPipeline(int64_t opt_level) {
   return top;
 }
 
-class StepwiseInlineAndSimplify : public FixedPointCompoundPass {
+class SimplifyAndStepwiseInline : public FixedPointCompoundPass {
  public:
-  explicit StepwiseInlineAndSimplify(int64_t opt_level)
-      : FixedPointCompoundPass("step_inline_sim", "StepwiseInlineAndSimplify") {
-    Add<StepwiseInliningPass>();
-    Add<DeadFunctionEliminationPass>();
+  explicit SimplifyAndStepwiseInline(int64_t opt_level)
+      : FixedPointCompoundPass("sim_step_inline", "SimplifyAndStepwiseInline") {
     Add<IdentityRemovalPass>();
     Add<ConstantFoldingPass>();
     Add<DeadCodeEliminationPass>();
     Add<CanonicalizationPass>();
     Add<DeadCodeEliminationPass>();
     Add<ArithSimplificationPass>(opt_level);
+    Add<DeadCodeEliminationPass>();
+    Add<CsePass>();
     Add<DeadCodeEliminationPass>();
     //Add<ComparisonSimplificationPass>();
     //Add<DeadCodeEliminationPass>();
@@ -205,17 +205,21 @@ class StepwiseInlineAndSimplify : public FixedPointCompoundPass {
     Add<DeadCodeEliminationPass>();
     Add<TupleSimplificationPass>();
     Add<DeadCodeEliminationPass>();
-    //Add<StrengthReductionPass>(opt_level);
-    //Add<DeadCodeEliminationPass>();
+    Add<StrengthReductionPass>(opt_level);
+    Add<DeadCodeEliminationPass>();
     Add<ArraySimplificationPass>(opt_level);
     Add<DeadCodeEliminationPass>();
-    //Add<NarrowingPass>(/*use_range_analysis=*/false, opt_level);
+    Add<NarrowingPass>(/*use_range_analysis=*/false, opt_level);
     //Add<DeadCodeEliminationPass>();
     Add<ArithSimplificationPass>(opt_level);
     Add<DeadCodeEliminationPass>();
     //Add<BooleanSimplificationPass>();
     //Add<DeadCodeEliminationPass>();
     Add<CsePass>();
+
+    // Simpily at first. Then stepwise inline.
+    Add<StepwiseInliningPass>();
+    Add<DeadFunctionEliminationPass>();
   }
 };
 
@@ -229,7 +233,7 @@ std::unique_ptr<CompoundPass> CreateStandardPassPipelineForLargeFile(int64_t opt
   // minimum of the two values. Same below.
   top->Add<UnrollPass>();
   top->Add<MapInliningPass>();
-  top->Add<StepwiseInlineAndSimplify>(1);
+  top->Add<SimplifyAndStepwiseInline>(1);
   return top;
 }
 
