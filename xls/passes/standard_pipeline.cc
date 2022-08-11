@@ -240,6 +240,8 @@ std::unique_ptr<CompoundPass> CreateStandardPassPipelineForLargeFile(int64_t opt
 std::unique_ptr<CompoundPass> CreateSimplificationPipeline(int64_t opt_level) {
   auto top = std::make_unique<CompoundPass>("ir", "Top level pass pipeline");
   top->Add<SimplificationPass>(std::min(int64_t{3}, opt_level));
+  top->Add<LiteralUncommoningPass>();
+  top->Add<DeadFunctionEliminationPass>();
   return top;
 }
 
