@@ -705,6 +705,22 @@ cc_binary(
 )
 
 cc_binary(
+    name = "print_nodes_break_down_main",
+    srcs = ["print_nodes_break_down_main.cc"],
+    visibility = ["//xls:xls_users"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings:str_format",
+        "//xls/common:init_xls",
+        "//xls/common/file:filesystem",
+        "//xls/common/logging",
+        "//xls/common/status:status_macros",
+        "//xls/ir",
+        "//xls/ir:ir_parser",
+    ],
+)
+
+cc_binary(
     name = "opt_main_for_large",
     srcs = ["opt_main_for_large.cc"],
     visibility = ["//xls:xls_users"],
