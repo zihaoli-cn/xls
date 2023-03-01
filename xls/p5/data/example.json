@@ -1,0 +1,134 @@
+{
+    "TYNAME":   "BLOCK",
+    "OP0": {
+		"TYNAME":   "IDENT",
+		"INT":	"54",
+		"STRING":	"_CZ_9324",
+		"FNAME":	"0",
+		"LINENO":	162
+	},
+	"OP1":	{
+        "TYNAME":	"LIST",
+        "VALUES":	[{
+            "TYNAME":	"IF",
+            "OP0":	{
+                "TYNAME":	"EQ",
+                "OP0":	{
+                    "TYNAME":	"IDENT",
+                    "STRING":   "a"
+                },
+                "OP1": {
+                    "TYNAME":	"IDENT",
+                    "STRING":   "b"
+                }
+            },
+            "OP1":	{
+                "TYNAME":   "RETURN"
+            }
+        },
+        {
+            "TYNAME":	"ASSIGN",
+            "OP0":	{
+                "TYNAME":	"IDENT",
+                "STRING":   "c"
+            },
+            "OP1": {
+                "TYNAME":	"INT_LIT",
+                "INT":	"1"
+            }
+        },
+        {
+            "TYNAME":	"IF",
+            "OP0":	{
+                "TYNAME":	"FUNCTION_CALL",
+                "OP0": {
+                    "TYNAME":	"IDENT",
+                    "STRING":	"_valid"
+                },
+                "OP1":	{
+                    "TYNAME":	"LIST",
+                    "VALUES":	[{
+                        "TYNAME":	"IDENT",
+                        "STRING":   "d"
+                    }]  
+                }
+            },
+            "OP1":	{
+                "TYNAME":	"IF",
+                "OP0":	{
+                    "TYNAME":	"LAND",
+                    "OP0": {
+                        "TYNAME":	"NE",
+                        "OP0":  {
+                            "TYNAME":   "IDENT",
+                            "STRING":   "n"
+                        },
+                        "OP1":  {
+                            "TYNAME":	"INT_LIT",
+                            "INT":	"3"
+                        }
+                    },
+                    "OP1": {
+                        "TYNAME":	"EQ",
+                        "OP0":  {
+                            "TYNAME":   "IDENT",
+                            "STRING":   "m"
+                        },
+                        "OP1":  {
+                            "TYNAME":	"PLUS",
+                            "OP0":  {
+                                "TYNAME":   "IDENT",
+                                "STRING":   "n"
+                            },
+                            "OP1":  {
+                                "TYNAME":	"INT_LIT",
+                                "INT":	"1"
+                            }
+                        }
+                    }
+                },
+                "OP1": {
+                    "TYNAME":	"ASSIGN",
+                    "OP0":	{
+                        "TYNAME":	"IDENT",
+                        "STRING":   "c"
+                    },
+                    "OP1": {
+                        "TYNAME":	"IDENT",
+                        "STRING":   "d"
+                    }
+                },
+                "OP2": {
+                    "TYNAME":	"ASSIGN",
+                    "OP0":	{
+                        "TYNAME":	"IDENT",
+                        "STRING":   "a"
+                    },
+                    "OP1": {
+                        "TYNAME":	"IDENT",
+                        "STRING":   "b"
+                    }
+                }
+            },
+            "OP2":	{
+                "TYNAME":	"ASSIGN",
+                "OP0":	{
+                    "TYNAME":	"IDENT",
+                    "STRING":   "a"
+                },
+                "OP1": {
+                    "TYNAME":	"PLUS",
+                    "OP0":	{
+                        "TYNAME":	"IDENT",
+                        "STRING":   "b"
+                    },
+                    "OP1":  {
+                        "TYNAME":	"INT_LIT",
+                        "INT":	"61"
+                    }
+                }
+            }
+        }
+        ]
+    }
+}

@@ -1,0 +1,15 @@
+{ // block-name: _CZ_9324
+  if((EQ a b))
+    return;
+  c.low_4 = 1/* <64bits>int_lit */;
+  if(_valid(d,))
+    { // block-name: _CZ_9325
+      _valid_set(c,0/* <1bits>false */,);
+      if((LAND (NE n 3/* <64bits>int_lit */) (EQ m (PLUS n 1/* <64bits>int_lit */))))
+        c.c.high_48 = (uint48<48>)(uint32<32>)d;
+      else
+        a = b;
+    }
+  else
+    a = (PLUS b 16/* <64bits>int_lit */);
+}
