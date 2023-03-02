@@ -5,6 +5,7 @@
 #include "absl/types/optional.h"
 #include "absl/types/variant.h"
 #include "xls/p5/keywords.h"
+#include "xls/p5/util/json.hpp"
 
 #include <cstdint>
 #include <map>
@@ -83,7 +84,7 @@ public:
   absl::Status VisitExpr(Expr *) override;
 };
 
-// TODO: Add method: AddDebugInfo, AddAnno, DumpJson
+// TODO: Add method: AddDebugInfo, AddAnno
 // NOT-IMPORTANT
 class AstNode {
 public:
@@ -132,6 +133,8 @@ public:
 
   virtual std::string ToString(uint32_t indent = 2, uint32_t pad = 0) const = 0;
 
+  virtual nlohmann::json ToJson() const = 0;
+
   Module *module() const { return module_; }
 
 private:
@@ -164,6 +167,8 @@ public:
 
   std::string ToString(uint32_t indent = 2, uint32_t pad = 0) const override;
 
+  nlohmann::json ToJson() const override;
+
   absl::Status Accept(AstNodeVisitor *visitor) override {
     return visitor->VisitFakeVarDef(this);
   }
@@ -189,6 +194,8 @@ public:
   absl::Status Accept(AstNodeVisitor *visitor) override {
     return visitor->VisitTypeAnnotation(this);
   }
+
+  nlohmann::json ToJson() const override;
 
 private:
   uint32_t size_;
@@ -218,6 +225,8 @@ public:
     return visitor->VisitBinaryOpExpr(this);
   }
 
+  nlohmann::json ToJson() const override;
+
 private:
   OpKind op_;
   Expr *lhs_;
@@ -239,6 +248,8 @@ public:
   absl::Status Accept(AstNodeVisitor *visitor) override {
     return visitor->VisitUnaryOpExpr(this);
   }
+
+  nlohmann::json ToJson() const override;
 
 private:
   OpKind op_;
@@ -271,6 +282,7 @@ public:
   absl::Status Accept(AstNodeVisitor *visitor) override {
     return visitor->VisitIntLiteralExpr(this);
   }
+  nlohmann::json ToJson() const override;
 
 private:
   value_type value_;
@@ -291,6 +303,8 @@ public:
   absl::Status Accept(AstNodeVisitor *visitor) override {
     return visitor->VisitLongIntLiteralExpr(this);
   }
+
+  nlohmann::json ToJson() const override;
 
 private:
   std::vector<uint64_t> value_;
@@ -316,6 +330,8 @@ public:
     return visitor->VisitBuiltinCallExpr(this);
   }
 
+  nlohmann::json ToJson() const override;
+
 private:
   std::string callee_;
   std::vector<Expr *> args_;
@@ -338,6 +354,8 @@ public:
   }
 
   bool ReplaceChild(AstNode *child, AstNode *dst) override;
+
+  nlohmann::json ToJson() const override;
 
 private:
   Expr *expr_to_cast_;
@@ -365,6 +383,8 @@ public:
   absl::Status Accept(AstNodeVisitor *visitor) override {
     return visitor->VisitArrIndexExpr(this);
   }
+
+  nlohmann::json ToJson() const override;
 
 private:
   Lvalue *expr_;
@@ -405,6 +425,8 @@ public:
     return visitor->VisitNameRefExpr(this);
   }
 
+  nlohmann::json ToJson() const override;
+
 private:
   std::string name_;
   absl::optional<Annotation> annotation_ = absl::nullopt;
@@ -424,6 +446,8 @@ public:
   }
 
   bool ReplaceChild(AstNode *child, AstNode *dst) override;
+
+  nlohmann::json ToJson() const override { return def_->ToJson(); }
 
 private:
   FakeVarDef *def_;
@@ -469,6 +493,8 @@ public:
 
   absl::optional<Annotation> annotation() const { return type_info_; }
 
+  nlohmann::json ToJson() const override;
+
 private:
   Lvalue *source_;
   std::string field_name_;
@@ -494,6 +520,8 @@ public:
   }
 
   bool ReplaceChild(AstNode *child, AstNode *dst) override;
+
+  nlohmann::json ToJson() const override;
 
 private:
   Expr *target_;
@@ -533,6 +561,8 @@ public:
 
   bool ReplaceChild(AstNode *child, AstNode *dst) override;
 
+  nlohmann::json ToJson() const override;
+
 private:
   std::string name_;
   std::vector<Stmt *> stmts_;
@@ -549,6 +579,12 @@ public:
   absl::Status Accept(AstNodeVisitor *visitor) override {
     return visitor->VisitReturnStmt(this);
   }
+
+  nlohmann::json ToJson() const override {
+    auto result = nlohmann::json::object();
+    result["TYNAME"] = "RETURN";
+    return result;
+  }
 };
 
 class NopStmt : public Stmt {
@@ -561,6 +597,12 @@ public:
 
   absl::Status Accept(AstNodeVisitor *visitor) override {
     return visitor->VisitNopStmt(this);
+  }
+
+  nlohmann::json ToJson() const override {
+    auto result = nlohmann::json::object();
+    result["TYNAME"] = "NOP";
+    return result;
   }
 };
 
@@ -588,6 +630,15 @@ public:
   }
 
   bool ReplaceChild(AstNode *child, AstNode *dst) override;
+
+  nlohmann::json ToJson() const override {
+    auto result = nlohmann::json::object();
+    result["TYNAME"] = "IF";
+    result["OP0"] = condition()->ToJson();
+    result["OP1"] = then_block()->ToJson();
+    result["OP2"] = else_block()->ToJson();
+    return result;
+  }
 
 private:
   Expr *cond_;
@@ -617,6 +668,14 @@ public:
 
   bool ReplaceChild(AstNode *child, AstNode *dst) override;
 
+  nlohmann::json ToJson() const override {
+    auto result = nlohmann::json::object();
+    result["TYNAME"] = "IF";
+    result["OP0"] = condition()->ToJson();
+    result["OP1"] = then_block()->ToJson();
+    return result;
+  }
+
 private:
   Expr *cond_;
   Stmt *then_block_;
@@ -642,6 +701,14 @@ public:
 
   bool ReplaceChild(AstNode *child, AstNode *dst) override;
 
+  nlohmann::json ToJson() const override {
+    auto result = nlohmann::json::object();
+    result["TYNAME"] = "ASSIGN";
+    result["OP0"] = lhs()->ToJson();
+    result["OP1"] = rhs()->ToJson();
+    return result;
+  }
+
 private:
   Lvalue *lhs_;
   Expr *rhs_;
@@ -663,6 +730,8 @@ public:
     return visitor->VisitExprEvalStmt(this);
   }
   bool ReplaceChild(AstNode *child, AstNode *dst) override;
+
+  nlohmann::json ToJson() const override { return expr()->ToJson(); }
 
 private:
   Expr *expr_;
@@ -728,6 +797,8 @@ public:
   VarRefExpr *AddVarRefExpr(FakeVarDef *def);
 
   Stmt *AddStmtCopy(Stmt *stmt);
+
+  nlohmann::json ToJson() const override { return body->ToJson(); }
 
   StmtBlock *body;
   std::map<std::string, FakeVarDef *> name2def;

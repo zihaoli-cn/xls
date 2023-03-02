@@ -22,6 +22,7 @@ cc_library(
   deps = [
       ":keywords",
       "//xls/common/logging:logging",
+      "//xls/p5/util:nlohmann_json",
       "@com_google_absl//absl/strings:strings",
       "@com_google_absl//absl/strings:str_format",
       "@com_google_absl//absl/status:status",

@@ -650,4 +650,151 @@ bool Module::ReplaceChild(AstNode *child, AstNode *dst) {
   return false;
 }
 
+namespace to_json {
+nlohmann::json CreateIntLiteral(uint64_t value) {
+  auto result = nlohmann::json::object();
+  result["TYNAME"] = "INT_LIT";
+
+  std::string str = std::to_string(value);
+  result["INT"] = std::string(str.rbegin(), str.rend());
+  return result;
+}
+
+nlohmann::json CreateIdentifier(const std::string &str) {
+  auto result = nlohmann::json::object();
+  result["TYNAME"] = "IDENT";
+  result["STRING"] = str;
+  return result;
+}
+} // namespace to_json
+
+nlohmann::json FakeVarDef::ToJson() const {
+  auto result = to_json::CreateIdentifier(name());
+  if (size() != absl::nullopt) {
+    result["SIZE"] = *size();
+    result["GLOBAL"] = (int)is_global();
+  }
+  return result;
+}
+
+nlohmann::json TypeAnnotation::ToJson() const {
+  auto result = to_json::CreateIdentifier(std::string(name()));
+  result["TYPESIZE"] = size();
+  return result;
+}
+
+nlohmann::json BinaryOpExpr::ToJson() const {
+  auto result = nlohmann::json::object();
+  result["TYNAME"] = OpKindToString(GetOpKind());
+  result["OP0"] = lhs()->ToJson();
+  result["OP1"] = rhs()->ToJson();
+  return result;
+}
+
+nlohmann::json UnaryOpExpr::ToJson() const {
+  auto result = nlohmann::json::object();
+  result["TYNAME"] = OpKindToString(GetOpKind());
+  result["OP0"] = operand()->ToJson();
+  return result;
+}
+
+nlohmann::json IntLiteralExpr::ToJson() const {
+  return to_json::CreateIntLiteral(value_);
+}
+
+nlohmann::json LongIntLiteralExpr::ToJson() const {
+  auto result = nlohmann::json::object();
+  result["TYNAME"] = "LIST";
+  result["VALUES"] = nlohmann::json::array();
+
+  auto &buffer = result["VALUES"];
+  for (uint64_t v : value()) {
+    buffer.push_back(to_json::CreateIntLiteral(v));
+  }
+  return result;
+}
+
+nlohmann::json BuiltinCallExpr::ToJson() const {
+  auto result = nlohmann::json::object();
+  result["TYNAME"] = "FUNCTION_CALL";
+
+  result["OP0"] = to_json::CreateIdentifier(callee());
+
+  result["OP1"] = nlohmann::json::object();
+  result["OP1"]["TYNAME"] = "LIST";
+  result["OP1"]["VALUES"] = nlohmann::json::array();
+
+  auto &buffer = result["OP1"]["VALUES"];
+  for (Expr *arg : args()) {
+    buffer.push_back(arg->ToJson());
+  }
+  return result;
+}
+
+nlohmann::json CastExpr::ToJson() const {
+  auto result = nlohmann::json::object();
+  result["TYNAME"] = "CAST";
+  result["OP0"] = expr_to_cast()->ToJson();
+  result["OP1"] = cast_to()->ToJson();
+  return result;
+}
+
+nlohmann::json ArrIndexExpr::ToJson() const {
+  auto result = nlohmann::json::object();
+  result["TYNAME"] = "INDEX";
+  result["OP0"] = expr()->ToJson();
+  result["OP1"] = to_json::CreateIntLiteral(idx());
+  return result;
+}
+
+nlohmann::json NameRefExpr::ToJson() const {
+  auto result = to_json::CreateIdentifier(name());
+  if (annotation() != absl::nullopt) {
+    result["SIZE"] = annotation()->size;
+    result["GLOBAL"] = (int)(annotation()->is_global);
+  }
+  return result;
+}
+
+nlohmann::json FieldAccessExpr::ToJson() const {
+  auto result = nlohmann::json::object();
+  result["TYNAME"] = "DOT";
+  result["OP0"] = source()->ToJson();
+  result["OP1"] = to_json::CreateIdentifier(std::string(field_name()));
+
+  if (annotation() != absl::nullopt) {
+    result["SIZE"] = annotation()->size;
+    result["GLOBAL"] = (int)(annotation()->is_global);
+    result["STRUCT"] = annotation()->struct_var_name;
+    result["OFFSET"] = (int)(annotation()->offset);
+  }
+  return result;
+}
+
+nlohmann::json BitSliceExpr::ToJson() const {
+  auto result = nlohmann::json::object();
+  result["TYNAME"] = "SLICE";
+  result["OP0"] = target()->ToJson();
+  result["OP1"] = to_json::CreateIntLiteral(max_bit());
+  result["OP2"] = to_json::CreateIntLiteral(min_bit());
+  return result;
+}
+
+nlohmann::json StmtBlock::ToJson() const {
+  auto result = nlohmann::json::object();
+  result["TYNAME"] = "BLOCK";
+
+  result["OP0"] = to_json::CreateIdentifier(std::string(name()));
+
+  result["OP1"] = nlohmann::json::object();
+  result["OP1"]["TYNAME"] = "LIST";
+  result["OP1"]["VALUES"] = nlohmann::json::array();
+
+  auto &buffer = result["OP1"]["VALUES"];
+  for (Stmt *stmt : stmts()) {
+    buffer.push_back(stmt->ToJson());
+  }
+  return result;
+}
+
 } // namespace xls::p5
