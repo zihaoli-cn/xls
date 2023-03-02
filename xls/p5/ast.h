@@ -84,6 +84,32 @@ public:
   absl::Status VisitExpr(Expr *) override;
 };
 
+class VisitAll : public AstNodeVisitorWithDefault {
+public:
+  virtual absl::Status VisitModule(Module *node) override;
+  virtual absl::Status VisitStmtBlock(StmtBlock *node) override;
+  virtual absl::Status VisitIfStmt(IfStmt *node) override;
+  virtual absl::Status VisitIfElseStmt(IfElseStmt *node) override;
+  virtual absl::Status VisitAssignStmt(AssignStmt *node) override;
+  virtual absl::Status VisitExprEvalStmt(ExprEvalStmt *node) override;
+  virtual absl::Status VisitBuiltinCallExpr(BuiltinCallExpr *node) override;
+  virtual absl::Status VisitNameRefExpr(NameRefExpr *node) override;
+  virtual absl::Status VisitFieldAccessExpr(FieldAccessExpr *node) override;
+  virtual absl::Status VisitArrIndexExpr(ArrIndexExpr *node) override;
+  virtual absl::Status VisitBitSliceExpr(BitSliceExpr *node) override;
+  virtual absl::Status VisitBinaryOpExpr(BinaryOpExpr *node) override;
+  virtual absl::Status VisitUnaryOpExpr(UnaryOpExpr *node) override;
+  virtual absl::Status VisitCastExpr(CastExpr *node) override;
+  virtual absl::Status VisitIntLiteralExpr(IntLiteralExpr *node) override;
+  virtual absl::Status
+  VisitLongIntLiteralExpr(LongIntLiteralExpr *node) override;
+  virtual absl::Status VisitReturnStmt(ReturnStmt *node) override;
+  virtual absl::Status VisitNopStmt(NopStmt *node) override;
+  virtual absl::Status VisitTypeAnnotation(TypeAnnotation *node) override;
+  virtual absl::Status VisitFakeVarDef(FakeVarDef *node) override;
+  virtual absl::Status VisitVarRefExpr(VarRefExpr *node) override;
+};
+
 // TODO: Add method: AddDebugInfo, AddAnno
 // NOT-IMPORTANT
 class AstNode {
