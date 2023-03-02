@@ -67,3 +67,22 @@ cc_binary(
         "@com_google_absl//absl/strings",
     ],
 )
+
+cc_binary(
+    name = "json_ast_round_trip_main",
+    srcs = ["json_ast_round_trip_main.cc"],
+    deps = [
+        "//xls/p5/util:nlohmann_json",
+        "//xls/p5/util:load_json",
+        "//xls/p5:ast",
+        "//xls/p5:json_ast_parser",
+        "//xls/common:init_xls",
+        "//xls/common/logging:log_flags",
+        "//xls/common/logging:logging",
+        "//xls/common/logging:vlog_is_on",
+        "//xls/common/status:status_macros",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/status:status",
+        "@com_google_absl//absl/strings",
+    ],
+)
