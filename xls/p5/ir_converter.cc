@@ -191,7 +191,7 @@ protected:
 //     stmt.. | }
 //   }        |
 // }          |
-class NestIfStmtElimination : public VisitAll {
+class NestedIfStmtElimination : public VisitAll {
 public:
   absl::Status VisitModule(Module *module) override {
     changed_ = true;
@@ -237,7 +237,7 @@ private:
   bool changed_ = false;
 };
 
-class NestIfStmtEliminationVerify : public VisitAll {
+class NestedIfStmtEliminationVerify : public VisitAll {
 public:
   absl::Status VisitIfStmt(IfStmt *stmt) override {
     auto parent = stmt->parent();
@@ -840,30 +840,6 @@ public:
   }
 };
 
-// Verify that the Module is handled by Lowering Transforms
-//  and it is already suiable to gernerate IR
-absl::Status VerifyLowering(Module *module) {
-  XLS_CHECK(module);
-
-  UselessBlockEliminationVerify verfy_no_useless_block;
-  XLS_RETURN_IF_ERROR(verfy_no_useless_block.VisitModule(module));
-
-  NestIfStmtEliminationVerify verify_no_nested_if;
-  XLS_RETURN_IF_ERROR(verify_no_nested_if.VisitModule(module));
-
-  FieldAccessEliminationVerify verify1;
-  XLS_RETURN_IF_ERROR(verify1.VisitModule(module));
-  ArrayAccessEliminationVerify verify2;
-  XLS_RETURN_IF_ERROR(verify2.VisitModule(module));
-  ValidAndVaildSetEliminationVerify verify3;
-  XLS_RETURN_IF_ERROR(verify3.VisitModule(module));
-  NameRefElimationVerify verify4;
-  XLS_RETURN_IF_ERROR(verify4.VisitModule(module));
-  NestedSliceElimationVerify verify5;
-  XLS_RETURN_IF_ERROR(verify5.VisitModule(module));
-  return absl::OkStatus();
-}
-
 struct LoweringInfo {
   FieldAccessLoweringInfo field_access;
   ArrayIndexLoweringInfo arr_idx;
@@ -880,13 +856,6 @@ absl::Status LoweringTransform(LoweringInfo *info, Module *module,
                                const std::string &delimiter, bool need_verify,
                                xls::p5::LoweringMappingRel *mapping) {
   XLS_CHECK(info && module);
-
-  UselessBlockElimination useless_block_elimination;
-  XLS_RETURN_IF_ERROR(useless_block_elimination.VisitModule(module));
-
-  NestIfStmtElimination nested_if_combiner;
-  XLS_RETURN_IF_ERROR(nested_if_combiner.VisitModule(module));
-
   // DEBUG
   // XLS_LOG(INFO) std::cout
   //    << "After removing Useless Block and combining Nested IfStmt: \n"
@@ -904,11 +873,31 @@ absl::Status LoweringTransform(LoweringInfo *info, Module *module,
   NameRefElimation lowering4(&(info->name_ref), mapping);
   XLS_RETURN_IF_ERROR(lowering4.VisitModule(module));
 
-  NestedSliceElimation lowering5(&(info->nested_slice), mapping);
-  XLS_RETURN_IF_ERROR(lowering5.VisitModule(module));
+  UselessBlockElimination useless_block_eliminator;
+  XLS_RETURN_IF_ERROR(useless_block_eliminator.VisitModule(module));
+
+  NestedIfStmtElimination nested_if_combiner;
+  XLS_RETURN_IF_ERROR(nested_if_combiner.VisitModule(module));
+
+  NestedSliceElimation nested_slice_eliminator(&(info->nested_slice), mapping);
+  XLS_RETURN_IF_ERROR(nested_slice_eliminator.VisitModule(module));
 
   if (need_verify) {
-    XLS_RETURN_IF_ERROR(VerifyLowering(module));
+    FieldAccessEliminationVerify verify1;
+    XLS_RETURN_IF_ERROR(verify1.VisitModule(module));
+    ArrayAccessEliminationVerify verify2;
+    XLS_RETURN_IF_ERROR(verify2.VisitModule(module));
+    ValidAndVaildSetEliminationVerify verify3;
+    XLS_RETURN_IF_ERROR(verify3.VisitModule(module));
+    NameRefElimationVerify verify4;
+    XLS_RETURN_IF_ERROR(verify4.VisitModule(module));
+    
+    UselessBlockEliminationVerify verfy_no_useless_block;
+    XLS_RETURN_IF_ERROR(verfy_no_useless_block.VisitModule(module));
+    NestedIfStmtEliminationVerify verify_no_nested_if;
+    XLS_RETURN_IF_ERROR(verify_no_nested_if.VisitModule(module));
+    NestedSliceElimationVerify verify_no_slice;
+    XLS_RETURN_IF_ERROR(verify_no_slice.VisitModule(module));
 
     auto pred_def_has_size = [](FakeVarDef *def) -> bool {
       return def->size().has_value();
@@ -1142,6 +1131,7 @@ public:
   }
 };
 
+/*
 void AllocateSizeForCurrentlyUnknown(const std::set<FakeVarDef *> &variables,
                                      uint64_t size) {
   for (auto def : variables) {
@@ -1151,6 +1141,7 @@ void AllocateSizeForCurrentlyUnknown(const std::set<FakeVarDef *> &variables,
     }
   }
 }
+*/
 
 using namespace boost::icl;
 using LiveRange = std::pair<uint32_t, uint32_t>;
@@ -1928,8 +1919,7 @@ ConvertP5AstModuleToPackage(Module *ast_module, LoweringMappingRel *mapping) {
   constexpr auto func_name = "action";
   constexpr auto package_name = "p5";
 
-  std::unique_ptr<Package> package =
-      std::make_unique<Package>(package_name);
+  std::unique_ptr<Package> package = std::make_unique<Package>(package_name);
 
   P5ActionIrConverter converter(
       ast_module->body, func_name /* generated function name */, package.get(),
