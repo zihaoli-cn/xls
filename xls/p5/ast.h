@@ -560,6 +560,8 @@ public:
   Stmt(AstNodeKind kind, Module *module, Stmt *parent)
       : AstNode(kind, module, parent) {}
   explicit Stmt(AstNodeKind kind, Module *module) : AstNode(kind, module) {}
+
+  virtual uint64_t CountActiveStmt() const { return 1; }
 };
 
 class StmtBlock : public Stmt {
@@ -588,6 +590,14 @@ public:
   bool ReplaceChild(AstNode *child, AstNode *dst) override;
 
   nlohmann::json ToJson() const override;
+
+  uint64_t CountActiveStmt() const override {
+    uint64_t result = 1;
+    for (Stmt *stmt : stmts()) {
+      result += stmt->CountActiveStmt();
+    }
+    return result;
+  }
 
 private:
   std::string name_;
@@ -666,6 +676,10 @@ public:
     return result;
   }
 
+  uint64_t CountActiveStmt() const override {
+    return 1 + then_block()->CountActiveStmt() + else_block()->CountActiveStmt();
+  }
+
 private:
   Expr *cond_;
   Stmt *then_block_;
@@ -700,6 +714,10 @@ public:
     result["OP0"] = condition()->ToJson();
     result["OP1"] = then_block()->ToJson();
     return result;
+  }
+
+  uint64_t CountActiveStmt() const override {
+    return 1 + then_block()->CountActiveStmt();
   }
 
 private:
