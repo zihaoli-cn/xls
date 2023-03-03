@@ -84,9 +84,6 @@ struct AssignStmtOptions {
 //  uint64_t expected_active_stmt;
 //  uint64_t max_return_num;
 
-class MutaionOptions;
-class MutaionOptionsBuilder;
-
 class MutaionOptions {
 public:
   int precision_factor;
