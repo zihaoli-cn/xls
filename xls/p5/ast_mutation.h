@@ -11,20 +11,20 @@
 #include <set>
 
 namespace xls::p5 {
-
 /*
  Possible Mutation:
  1. StmtBlock:
-    - randomly remove each stmt, if so, save that stmt to stmt buffer
-    - insert a stmt from stmt buffer
+    - for each element stmt, randomly remove it, if it is removed, save that
+        stmt to stmt buffer
+    - if the stmt buffer is not empty, insert a stmt from stmt buffer
     - insert a new AssignStmt
         - LHS: pick a lhs from lhs buffer
         - RHS:
           - if size(rhs buffer) >= 2, pick two rhs from rhs buffer, create a
             random BinaryOpExpr
           - if size(rhs buffer) < 2, use that rhs directly
-    - randomly insert a return instruction at the end
     - randomly insert an IfStmt (if the condition buffer > 0) at random place
+    - randomly insert a return instruction at the end
  2. IfElseStmt:
     - negate the banch condition
     - remove else-clause, add that stmt to stmt buffer
@@ -42,6 +42,21 @@ namespace xls::p5 {
  expected-stmt-num
 
  */
+struct StmtBlockOptions {
+  int remove_rate;
+  int insert_from_buffer_rate;
+  int insert_assign_rate;
+  int insert_ret_rate;
+  int insert_if_rate;
+
+  explicit StmtBlockOptions(int remove_rate, int insert_from_buffer_rate,
+                            int insert_assign_rate, int insert_ret_rate,
+                            int insert_if_rate)
+      : remove_rate(remove_rate),
+        insert_from_buffer_rate(insert_from_buffer_rate),
+        insert_assign_rate(insert_assign_rate),
+        insert_ret_rate(insert_ret_rate), insert_if_rate(insert_if_rate) {}
+};
 
 struct IfElseStmtOptions {
   int negate_rate;
@@ -75,6 +90,7 @@ class MutaionOptionsBuilder;
 class MutaionOptions {
 public:
   int precision_factor;
+  absl::optional<StmtBlockOptions> block_opt;
   absl::optional<IfElseStmtOptions> if_else_opt;
   absl::optional<IfStmtOptions> if_opt;
   absl::optional<AssignStmtOptions> assign_opt;
@@ -91,6 +107,20 @@ public:
       : opt_(precision_factor) {}
 
   operator MutaionOptions() { return std::move(opt_); }
+
+  self &SupportStmtBlock(int remove_rate, int insert_from_buffer_rate,
+                         int insert_assign_rate, int insert_ret_rate,
+                         int insert_if_rate) {
+    XLS_CHECK(remove_rate <= opt_.precision_factor &&
+              insert_from_buffer_rate <= opt_.precision_factor &&
+              insert_assign_rate <= opt_.precision_factor &&
+              insert_ret_rate <= opt_.precision_factor &&
+              insert_if_rate <= opt_.precision_factor);
+    opt_.block_opt =
+        StmtBlockOptions(remove_rate, insert_from_buffer_rate,
+                         insert_assign_rate, insert_ret_rate, insert_if_rate);
+    return *this;
+  }
 
   self &SupportIf(int shrink_rate) {
     XLS_CHECK(shrink_rate <= opt_.precision_factor);
@@ -117,6 +147,13 @@ public:
 
 class AstMutation : public VisitAll {
 public:
+  int rand() {
+    std::uniform_int_distribution<int> distrib(1, options_.precision_factor);
+    return distrib(gen_);
+  }
+
+  AstMutation(const MutaionOptions &options) : options_(options) {}
+
   absl::Status VisitModule(Module *node) override;
   absl::Status VisitStmtBlock(StmtBlock *node) override;
   absl::Status VisitIfStmt(IfStmt *node) override;
@@ -125,7 +162,8 @@ public:
   absl::Status VisitLvalue(Lvalue *) override;
 
 private:
-  std::random_device rd_;
+  std::mt19937 gen_;
+  const MutaionOptions &options_;
 
   std::set<Stmt *> stmt_buffer_;
   std::set<Lvalue *> lhs_buffer_;
