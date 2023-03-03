@@ -79,3 +79,16 @@ cc_library(
       "@com_google_absl//absl/status:status"
       ],
 )
+
+cc_library(
+  name = "ast_mutation",
+  srcs = ["ast_mutation.cc"],
+  hdrs = ["ast_mutation.h"],
+  deps = [
+      ":ast",
+      "//xls/common/logging:logging",
+      "//xls/common/status:status_macros",
+      "@com_google_absl//absl/status:status",
+      "@com_google_absl//absl/types:optional",
+      ],
+)
