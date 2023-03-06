@@ -37,4 +37,24 @@ absl::Status AstMutation::VisitAssignStmt(AssignStmt *node) {
 
   return absl::OkStatus();
 }
+
+absl::Status AstMutation::VisitIfStmt(VisitIfStmt *if_stmt) {
+  Expr *cond = if_stmt->condition();
+  Stmt *then_block = if_stmt->then_block();
+  if (rand() <= options_.if_opt->shrink_rate) {
+    // Shrink to a Stmt without condition.
+    cond_buffer_.insert(cond);
+    XLS_CHECK(if_stmt->parent()->ReplaceChild(if_stmt, then_block));
+  } else if (stmt_buffer_.size() > 0 &&
+             rand() <= options_.if_opt->extend_rate) {
+    // Extend it to an IfElseStmt (if the stmt buffer is not empty).
+    auto stmt_it = stmt_buffer_.begin();
+    Stmt *new_stmt = node->module()->AddIfElseStmt(cond, then_block, *stmt_it);
+    XLS_CHECK(if_stmt->parent()->ReplaceChild(if_stmt, new_stmt));
+    stmt_buffer_.erase(stmt_it);
+  } else {
+    rhs_buffer_.insert(cond);
+  }
+  return absl::OkStatus();
+}
 } // namespace xls::p5

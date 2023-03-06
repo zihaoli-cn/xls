@@ -31,6 +31,7 @@ namespace xls::p5 {
     - reverse then-clause and else-clause
  3. IfStmt:
     - shrink to a StmtBlock, save condition to condition buffer
+    - extend to a IfElseBlock, if the stmt buffer is not empty
  4. AssignStmt:
     - save active rhs to the rhs buffer
     - randomly replace lhs/rhs to currently active set of lhs/rhs
@@ -71,8 +72,10 @@ struct IfElseStmtOptions {
 
 struct IfStmtOptions {
   int shrink_rate;
+  int extend_rate;
 
-  explicit IfStmtOptions(int shrink_rate) : shrink_rate(shrink_rate) {}
+  explicit IfStmtOptions(int shrink_rate, int extend_rate)
+      : shrink_rate(shrink_rate), extend_rate(extend_rate) {}
 };
 
 struct AssignStmtOptions {
@@ -119,9 +122,10 @@ public:
     return *this;
   }
 
-  self &SupportIf(int shrink_rate) {
-    XLS_CHECK(shrink_rate <= opt_.precision_factor);
-    opt_.if_opt = IfStmtOptions(shrink_rate);
+  self &SupportIf(int shrink_rate, int extend_rate) {
+    XLS_CHECK(shrink_rate <= opt_.precision_factor &&
+              extend_rate <= opt_.precision_factor);
+    opt_.if_opt = IfStmtOptions(shrink_rate, extend_rate);
     return *this;
   }
 
