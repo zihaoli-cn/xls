@@ -57,4 +57,20 @@ absl::Status AstMutation::VisitIfStmt(VisitIfStmt *if_stmt) {
   }
   return absl::OkStatus();
 }
+
+absl::Status AstMutation::VisitIfElseStmt(IfElseStmt *if_else_stmt) {
+  Expr *cond = if_else_stmt->condition();
+  Stmt *then_block = if_else_stmt->then_block();
+  Stmt *else_block = if_else_stmt->else_block();
+  Stmt *new_stmt = nullptr;
+  if (rand() <= options_.if_else_opt->remove_else_rate) {
+    new_stmt = node->module()->AddIfStmt(cond, then_block);
+    stmt_buffer_.insert(else_block);
+  } else if (rand() <= options_.if_else_opt->reverse_clauses_rate) {
+    new_stmt = node->module()->AddIfElseStmt(cond, else_block, then_block);
+  }
+  XLS_CHECK(if_else_stmt->parent()->ReplaceChild(if_else_stmt, new_node));
+  return absl::OkStatus();
+}
+
 } // namespace xls::p5

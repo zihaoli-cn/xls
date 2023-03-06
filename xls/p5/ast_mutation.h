@@ -60,13 +60,11 @@ struct StmtBlockOptions {
 };
 
 struct IfElseStmtOptions {
-  int negate_rate;
   int remove_else_rate;
   int reverse_clauses_rate;
 
-  explicit IfElseStmtOptions(int negate_rate, int remove_else_rate,
-                             int reverse_clauses_rate)
-      : negate_rate(negate_rate), remove_else_rate(remove_else_rate),
+  explicit IfElseStmtOptions(int remove_else_rate, int reverse_clauses_rate)
+      : remove_else_rate(remove_else_rate),
         reverse_clauses_rate(reverse_clauses_rate) {}
 };
 
@@ -129,13 +127,11 @@ public:
     return *this;
   }
 
-  self &SupportIfElse(int negate_rate, int remove_else_rate,
-                      int reverse_clauses_rate) {
-    XLS_CHECK(negate_rate <= opt_.precision_factor &&
-              remove_else_rate <= opt_.precision_factor &&
+  self &SupportIfElse(int remove_else_rate, int reverse_clauses_rate) {
+    XLS_CHECK(remove_else_rate <= opt_.precision_factor &&
               reverse_clauses_rate <= opt_.precision_factor);
     opt_.if_else_opt =
-        IfElseStmtOptions(negate_rate, remove_else_rate, reverse_clauses_rate);
+        IfElseStmtOptions(remove_else_rate, reverse_clauses_rate);
     return *this;
   }
 
