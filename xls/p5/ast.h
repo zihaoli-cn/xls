@@ -579,6 +579,8 @@ public:
 
   const std::vector<Stmt *> &stmts() const { return stmts_; }
 
+  void ReplaceAll(const std::vector<Stmt *> &stmts);
+
   std::string_view name() const { return name_; }
 
   bool empty() const { return stmts_.empty(); }

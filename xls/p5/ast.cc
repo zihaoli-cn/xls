@@ -283,6 +283,13 @@ bool StmtBlock::ReplaceChild(AstNode *child, AstNode *dst) {
   return false;
 }
 
+void StmtBlock::ReplaceAll(const std::vector<Stmt *> &stmts) {
+  XLS_CHECK(std::all_of(stmts.begin(), stmts.end(),
+                        [](Stmt *stmt) { return stmt != nullptr; }));
+  stmts_.resize(stmts.size());
+  std::copy(stmts.begin(), stmts.end(), stmts_.begin());
+}
+
 std::string ReturnStmt::ToString(uint32_t indent, uint32_t pad) const {
   return std::string(pad, ' ') + "return;\n";
 }
