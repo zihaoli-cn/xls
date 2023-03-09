@@ -116,4 +116,7 @@ absl::Status AstMutation::VisitStmtBlock(StmtBlock *node) {
   return absl::OkStatus();
 }
 
+absl::Status AstMutation::VisitModule(Module *m) {
+  return VisitStmtBlock(m->body);
+}
 } // namespace xls::p5
