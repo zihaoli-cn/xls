@@ -101,6 +101,7 @@ cc_binary(
         "//xls/common/logging:logging",
         "//xls/common/logging:vlog_is_on",
         "//xls/common/status:status_macros",
+        "//xls/data_structures:union_find",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/status:status",
         "@com_google_absl//absl/strings",

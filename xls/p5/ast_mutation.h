@@ -6,6 +6,9 @@
 
 #include "xls/p5/ast.h"
 
+#include <cstdlib>
+#include <ctime>
+#include <iostream>
 #include <memory>
 #include <random>
 #include <set>
@@ -88,10 +91,10 @@ struct AssignStmtOptions {
 class MutaionOptions {
 public:
   int precision_factor;
-  absl::optional<StmtBlockOptions> block_opt;
-  absl::optional<IfElseStmtOptions> if_else_opt;
-  absl::optional<IfStmtOptions> if_opt;
-  absl::optional<AssignStmtOptions> assign_opt;
+  absl::optional<StmtBlockOptions> block_opt = absl::nullopt;
+  absl::optional<IfElseStmtOptions> if_else_opt = absl::nullopt;
+  absl::optional<IfStmtOptions> if_opt = absl::nullopt;
+  absl::optional<AssignStmtOptions> assign_opt = absl::nullopt;
 
   MutaionOptions(int precision_factor) : precision_factor(precision_factor) {}
 };
@@ -144,12 +147,23 @@ public:
 
 class AstMutation : public VisitAll {
 public:
-  int rand() {
+  /*int rand() {
     std::uniform_int_distribution<int> distrib(1, options_.precision_factor);
-    return distrib(gen_);
+
+    int tmp = distrib(gen_);
+    std::cerr << tmp << std::endl;
+    return tmp;
+  }*/
+
+  int rand() {
+    int tmp = 1 + (std::rand() % options_.precision_factor);
+    std::cerr << tmp << std::endl;
+    return tmp;
   }
 
-  AstMutation(const MutaionOptions &options) : options_(options) {}
+  AstMutation(const MutaionOptions &options) : options_(options) {
+    // std::srand(std::time(0));
+  }
 
   absl::Status VisitModule(Module *node) override;
   absl::Status VisitStmtBlock(StmtBlock *node) override;

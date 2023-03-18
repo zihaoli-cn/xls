@@ -90,5 +90,6 @@ cc_library(
       "//xls/common/status:status_macros",
       "@com_google_absl//absl/status:status",
       "@com_google_absl//absl/types:optional",
+      "@com_google_absl//absl/strings:str_format",
       ],
 )
