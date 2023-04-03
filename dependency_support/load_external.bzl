@@ -15,7 +15,7 @@
 """Provides helper that loads external repositories with third-party code."""
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository", "new_git_repository")
 load("//dependency_support/boost:workspace.bzl", repo_boost = "repo")
 load("//dependency_support/llvm_bazel:workspace.bzl", repo_llvm_bazel = "repo")
 load("//dependency_support/rules_hdl:workspace.bzl", repo_rules_hdl = "repo")
@@ -196,11 +196,43 @@ def load_external_repositories():
         shallow_since = "1644333305 -0500",
     )
 
+    http_archive(
+        name = "bliss",
+        build_file = "@com_google_ortools//bazel:bliss.BUILD",
+        patches = ["@com_google_ortools//bazel:bliss-0.73.patch"],
+        sha256 = "f57bf32804140cad58b1240b804e0dbd68f7e6bf67eba8e0c0fa3a62fd7f0f84",
+        url = "http://www.tcs.hut.fi/Software/bliss/bliss-0.73.zip",
+    )
+
+    # Eigen has no Bazel build.
+    new_git_repository(
+        name = "eigen",
+        tag = "3.4.0",
+        remote = "https://gitlab.com/libeigen/eigen.git",
+        build_file_content ="""
+cc_library(
+    name = 'eigen3',
+    srcs = [],
+    includes = ['.'],
+    hdrs = glob(['Eigen/**']),
+    visibility = ['//visibility:public'],
+)"""
+    )
+
     git_repository(
         name = "com_google_ortools",
         commit = "525162feaadaeef640783b2eaea38cf4b623877f",
         shallow_since = "1647023481 +0100",
         remote = "https://github.com/google/or-tools.git",
-        # Removes undesired dependencies like Eigen, BLISS, SCIP
+        # Removes undesired dependencies like Eigen, BLISS
         patches = ["@com_google_xls//dependency_support/com_google_ortools:remove_deps.diff"],
+    )
+
+    new_git_repository(
+        name = "scip",
+        build_file = "@com_google_ortools//bazel:scip.BUILD",
+        patches = ["@com_google_ortools//bazel:scip.patch"],
+        patch_args = ["-p1"],
+        tag = "v803",
+        remote = "https://github.com/scipopt/scip.git",
     )
