@@ -1,9 +1,11 @@
 #pragma once
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "absl/types/variant.h"
+
 #include "xls/p5/keywords.h"
 #include "xls/p5/util/json.hpp"
 
@@ -161,6 +163,10 @@ public:
 
   virtual nlohmann::json ToJson() const = 0;
 
+  virtual void CollectActiveNodes(absl::flat_hash_set<AstNode *> &active) {
+    active.insert(this);
+  }
+
   Module *module() const { return module_; }
 
 private:
@@ -243,6 +249,12 @@ public:
 
   Expr *rhs() const { return rhs_; }
 
+  void CollectActiveNodes(absl::flat_hash_set<AstNode *> &active) override {
+    active.insert(this);
+    lhs()->CollectActiveNodes(active);
+    rhs()->CollectActiveNodes(active);
+  }
+
   bool ReplaceChild(AstNode *child, AstNode *dst) override;
 
   std::string ToString(uint32_t indent = 2, uint32_t pad = 0) const override;
@@ -268,6 +280,11 @@ public:
   Expr *operand() const { return operand_; }
 
   std::string ToString(uint32_t indent = 2, uint32_t pad = 0) const override;
+
+  void CollectActiveNodes(absl::flat_hash_set<AstNode *> &active) override {
+    active.insert(this);
+    operand()->CollectActiveNodes(active);
+  }
 
   bool ReplaceChild(AstNode *child, AstNode *dst) override;
 
@@ -348,6 +365,13 @@ public:
 
   const std::vector<Expr *> &args() const { return args_; }
 
+  void CollectActiveNodes(absl::flat_hash_set<AstNode *> &active) override {
+    active.insert(this);
+    for (Expr *arg : args()) {
+      arg->CollectActiveNodes(active);
+    }
+  }
+
   std::string ToString(uint32_t indent = 2, uint32_t pad = 0) const override;
 
   bool ReplaceChild(AstNode *child, AstNode *dst) override;
@@ -374,6 +398,12 @@ public:
   TypeAnnotation *cast_to() const { return cast_to_; }
 
   std::string ToString(uint32_t indent = 2, uint32_t pad = 0) const override;
+
+  void CollectActiveNodes(absl::flat_hash_set<AstNode *> &active) override {
+    active.insert(this);
+    expr_to_cast()->CollectActiveNodes(active);
+    cast_to()->CollectActiveNodes(active);
+  }
 
   absl::Status Accept(AstNodeVisitor *visitor) override {
     return visitor->VisitCastExpr(this);
@@ -405,6 +435,11 @@ public:
   std::string ToString(uint32_t indent = 2, uint32_t pad = 0) const override;
 
   bool ReplaceChild(AstNode *child, AstNode *dst) override;
+
+  void CollectActiveNodes(absl::flat_hash_set<AstNode *> &active) override {
+    active.insert(this);
+    expr()->CollectActiveNodes(active);
+  }
 
   absl::Status Accept(AstNodeVisitor *visitor) override {
     return visitor->VisitArrIndexExpr(this);
@@ -471,6 +506,11 @@ public:
     return visitor->VisitVarRefExpr(this);
   }
 
+  void CollectActiveNodes(absl::flat_hash_set<AstNode *> &active) override {
+    active.insert(this);
+    def()->CollectActiveNodes(active);
+  }
+
   bool ReplaceChild(AstNode *child, AstNode *dst) override;
 
   nlohmann::json ToJson() const override { return def_->ToJson(); }
@@ -521,6 +561,11 @@ public:
 
   nlohmann::json ToJson() const override;
 
+  void CollectActiveNodes(absl::flat_hash_set<AstNode *> &active) override {
+    active.insert(this);
+    source()->CollectActiveNodes(active);
+  }
+
 private:
   Lvalue *source_;
   std::string field_name_;
@@ -548,6 +593,11 @@ public:
   bool ReplaceChild(AstNode *child, AstNode *dst) override;
 
   nlohmann::json ToJson() const override;
+
+  void CollectActiveNodes(absl::flat_hash_set<AstNode *> &active) override {
+    active.insert(this);
+    target()->CollectActiveNodes(active);
+  }
 
 private:
   Expr *target_;
@@ -599,6 +649,13 @@ public:
       result += stmt->CountActiveStmt();
     }
     return result;
+  }
+
+  void CollectActiveNodes(absl::flat_hash_set<AstNode *> &active) override {
+    active.insert(this);
+    for (Stmt *stmt : stmts()) {
+      stmt->CollectActiveNodes(active);
+    }
   }
 
 private:
@@ -679,7 +736,15 @@ public:
   }
 
   uint64_t CountActiveStmt() const override {
-    return 1 + then_block()->CountActiveStmt() + else_block()->CountActiveStmt();
+    return 1 + then_block()->CountActiveStmt() +
+           else_block()->CountActiveStmt();
+  }
+
+  void CollectActiveNodes(absl::flat_hash_set<AstNode *> &active) override {
+    active.insert(this);
+    condition()->CollectActiveNodes(active);
+    then_block()->CollectActiveNodes(active);
+    else_block()->CollectActiveNodes(active);
   }
 
 private:
@@ -722,6 +787,12 @@ public:
     return 1 + then_block()->CountActiveStmt();
   }
 
+  void CollectActiveNodes(absl::flat_hash_set<AstNode *> &active) override {
+    active.insert(this);
+    condition()->CollectActiveNodes(active);
+    then_block()->CollectActiveNodes(active);
+  }
+
 private:
   Expr *cond_;
   Stmt *then_block_;
@@ -746,6 +817,12 @@ public:
   }
 
   bool ReplaceChild(AstNode *child, AstNode *dst) override;
+
+  void CollectActiveNodes(absl::flat_hash_set<AstNode *> &active) override {
+    active.insert(this);
+    lhs()->CollectActiveNodes(active);
+    rhs()->CollectActiveNodes(active);
+  }
 
   nlohmann::json ToJson() const override {
     auto result = nlohmann::json::object();
@@ -779,6 +856,11 @@ public:
 
   nlohmann::json ToJson() const override { return expr()->ToJson(); }
 
+  void CollectActiveNodes(absl::flat_hash_set<AstNode *> &active) override {
+    active.insert(this);
+    expr()->CollectActiveNodes(active);
+  }
+
 private:
   Expr *expr_;
 };
@@ -788,6 +870,12 @@ public:
   Module() : AstNode(AstNodeKind::kModule, this) {}
 
   std::string ToString(uint32_t indent = 2, uint32_t pad = 0) const override;
+
+  void CollectActiveNodes(absl::flat_hash_set<AstNode *> &active) override {
+    active.reserve(elements.size());
+    active.insert(this);
+    body->CollectActiveNodes(active);
+  }
 
   absl::Status Accept(AstNodeVisitor *visitor) override {
     return visitor->VisitModule(this);
