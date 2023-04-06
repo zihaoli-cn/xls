@@ -2,7 +2,11 @@
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "xls/common/logging/logging.h"
+
+#include <algorithm>
 #include <fstream>
+#include <iostream>
+#include <iterator>
 #include <sstream>
 #include <string>
 namespace xls::p5 {
@@ -33,32 +37,32 @@ LoadJsonWithoutProfile(std::string_view filename) {
 absl::StatusOr<std::unique_ptr<nlohmann::json>>
 LoadJsonWithProfile(std::string_view filename, JsonProfiler *profiler) {
   // Open file.
-  std::ifstream input_file(std::string(filename));
-  if (!input_file.is_open()) {
+  std::ifstream ifile;
+  ifile.open(std::string(filename), std::ios_base::in);
+  if (!ifile.is_open()) {
     XLS_LOG(WARNING) << "Fail to load " << filename << ": file doesn't exist.";
     return absl::NotFoundError(absl::StrCat(filename, " is missing"));
   }
 
   // Read file into string.
-  std::string file_content =
-      std::string((std::istreambuf_iterator<char>(input_file)),
-                  std::istreambuf_iterator<char>());
+  std::string file_content((std::istreambuf_iterator<char>(ifile)),
+                           (std::istreambuf_iterator<char>()));
 
   // Define callback function for profiler.
-  nlohmann::json::parser_callback_t cb = [&](int depth,
-                                             json::parse_event_t event,
-                                             nlohmann::json &parsed) -> bool {
-    if (event == nlohmann::json::parse_event_t::object_start) {
+  nlohmann::json::parser_callback_t cb =
+      [&](int depth, nlohmann::detail::parse_event_t event,
+          nlohmann::json &parsed) -> bool {
+    if (event == nlohmann::detail::parse_event_t::object_start) {
       ++profiler->object;
-    } else if (event == nlohmann::json::parse_event_t::key) {
+    } else if (event == nlohmann::detail::parse_event_t::key) {
       ++profiler->key;
-    } else if (event == nlohmann::json::parse_event_t::value) {
+    } else if (event == nlohmann::detail::parse_event_t::value) {
       ++profiler->value;
-    } else if (event == nlohmann::json::parse_event_t::array_start) {
+    } else if (event == nlohmann::detail::parse_event_t::array_start) {
       ++profiler->array;
     }
-    profiler->max_depth = std::max(profiler->max_depth, depth);
-    profiler->depth_series.push_back(profiler);
+    profiler->max_depth = std::max(profiler->max_depth, (int64_t)depth);
+    profiler->depth_series.push_back(depth);
 
     // The parsed json should be kept.
     return true;
@@ -66,7 +70,7 @@ LoadJsonWithProfile(std::string_view filename, JsonProfiler *profiler) {
 
   std::unique_ptr<nlohmann::json> result = std::make_unique<nlohmann::json>();
   try {
-    *result = json::parse(file_content, cb);
+    *result = std::move(nlohmann::json::parse(file_content, cb));
   } catch (const nlohmann::detail::parse_error &e) {
     // parse error
     XLS_LOG(WARNING) << "Fail to parse json from" << filename;
