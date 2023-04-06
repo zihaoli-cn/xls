@@ -96,3 +96,26 @@ cc_library(
       "@com_google_absl//absl/strings:str_format",
       ],
 )
+
+cc_library(
+  name = "benchmark",
+  srcs = ["benchmark.cc"],
+  hdrs = ["benchmark.h"],
+  deps = [
+      ":ast",
+      ":ir_converter",
+      ":json_ast_parser",
+      "//xls/common/file:filesystem",
+      "//xls/common/status:status_macros",
+      "//xls/delay_model:delay_estimator",
+      "//xls/delay_model:delay_estimators",
+      "//xls/ir:ir",
+      "//xls/p5/util:load_json",
+      "//xls/p5/util:nlohmann_json",
+      "@com_google_absl//absl/flags:flag",
+      "@com_google_absl//absl/status:status",
+      "@com_google_absl//absl/status:statusor",
+      "@com_google_absl//absl/strings:str_format",
+      "@com_google_absl//absl/time",
+      ],
+)
