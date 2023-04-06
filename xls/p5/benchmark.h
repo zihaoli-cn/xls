@@ -58,6 +58,10 @@ public:
 
   std::string DumpCSV(bool print_vertical = true);
 
+  absl::Span<std::unique_ptr<Package>> packages() {
+    return absl::MakeSpan(ir_);
+  }
+
 private:
   std::string GetCurrentFileName() const;
   absl::Status Parse();
