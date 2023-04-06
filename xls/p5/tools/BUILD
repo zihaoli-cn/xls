@@ -142,5 +142,6 @@ cc_binary(
         "//xls/common/logging:vlog_is_on",
         "//xls/common/status:status_macros",
         "//xls/p5:benchmark",
+        "//xls/p5/util:load_json",
     ],
 )

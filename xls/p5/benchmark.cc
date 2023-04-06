@@ -34,6 +34,8 @@ TranslationBenchmark::TranslationBenchmark(const std::string &benchmark_dir,
                                            int32_t num_sample)
     : benchmark_dir_(benchmark_dir), prefix_(prefix), num_sample_(num_sample),
       current_idx_(0) {
+  json_info_.reserve(num_sample);
+
   json_ast_.reserve(num_sample);
   cpp_ast_.reserve(num_sample);
   parser_duration_.reserve(num_sample);
@@ -70,10 +72,12 @@ std::string TranslationBenchmark::GetCurrentFileName() const {
 }
 
 absl::Status TranslationBenchmark::Parse() {
+  json_info_.push_back(JsonProfiler());
+
   absl::Time start = absl::Now();
 
   XLS_ASSIGN_OR_RETURN(std::unique_ptr<nlohmann::json> json,
-                       LoadJson(GetCurrentFileName()));
+                       LoadJson(GetCurrentFileName(), &(json_info_.back())));
   XLS_ASSIGN_OR_RETURN(std::unique_ptr<Module> ast_module,
                        ParseModuleFromJson(*json));
 
@@ -306,6 +310,49 @@ std::string TranslationBenchmark::DumpDataDepResult(bool print_vertical) {
     vector_of_vector.push_back(&ir_cp_delay_);
     vector_of_vector.push_back(&ir_params_);
     vector_of_vector.push_back(&ir_params_bitcount_);
+  }
+
+  return DumpTable(num_sample_, headers, vector_of_vector, print_vertical, ",",
+                   "\n");
+}
+
+std::string TranslationBenchmark::DumpJsonStatistics(bool print_vertical) {
+  std::string result;
+
+  std::vector<std::string> headers = {"ID", "Object", "Key", "Value", "Array"};
+
+  std::vector<int64_t> id_vec;
+
+  std::vector<int64_t> object_vec;
+  std::vector<int64_t> key_vec;
+  std::vector<int64_t> val_vec;
+  std::vector<int64_t> arr_vec;
+
+  id_vec.reserve(num_sample_);
+
+  object_vec.reserve(num_sample_);
+  key_vec.reserve(num_sample_);
+  val_vec.reserve(num_sample_);
+  arr_vec.reserve(num_sample_);
+
+  for (int i = 0; i < num_sample_; ++i) {
+    id_vec.push_back(i);
+
+    object_vec.push_back(json_info_.at(i).object);
+    key_vec.push_back(json_info_.at(i).key);
+    val_vec.push_back(json_info_.at(i).value);
+    arr_vec.push_back(json_info_.at(i).array);
+  }
+
+  std::vector<VectorPtrType> vector_of_vector;
+  vector_of_vector.reserve(headers.size());
+  {
+    vector_of_vector.push_back(&id_vec);
+
+    vector_of_vector.push_back(&object_vec);
+    vector_of_vector.push_back(&key_vec);
+    vector_of_vector.push_back(&val_vec);
+    vector_of_vector.push_back(&arr_vec);
   }
 
   return DumpTable(num_sample_, headers, vector_of_vector, print_vertical, ",",

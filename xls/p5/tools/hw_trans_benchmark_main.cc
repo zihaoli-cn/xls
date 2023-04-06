@@ -43,6 +43,8 @@ absl::Status RealMain(const std::string &benchmark_dir,
   p5::TranslationBenchmark benchmark(benchmark_dir, prefix, size);
   XLS_RETURN_IF_ERROR(benchmark.Run());
 
+  std::cout << benchmark.DumpJsonStatistics(print_vertical) << std::endl;
+
   std::cout << benchmark.DumpHWTransResult(print_vertical) << std::endl;
 
   std::cout << "\n" << benchmark.DumpDataDepResult(print_vertical) << std::endl;

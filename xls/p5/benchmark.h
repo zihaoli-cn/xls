@@ -12,6 +12,7 @@
 
 #include "xls/p5/ast.h"
 #include "xls/p5/util/json.hpp"
+#include "xls/p5/util/load_json.h"
 
 #include <string>
 
@@ -54,6 +55,11 @@ public:
 
   absl::Status Run();
 
+  std::string DumpJsonStatistics(bool print_vertical = true);
+
+  // TODO
+  //  std::string DumpJsonDepthSerise();
+
   std::string DumpHWTransResult(bool print_vertical = true);
   std::string DumpDataDepResult(bool print_vertical = true);
 
@@ -73,6 +79,8 @@ private:
   const int32_t num_sample_;
 
   int32_t current_idx_;
+
+  std::vector<JsonProfiler> json_info_;
 
   std::vector<std::unique_ptr<nlohmann::json>> json_ast_;
   std::vector<std::unique_ptr<Module>> cpp_ast_;
