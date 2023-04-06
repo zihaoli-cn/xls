@@ -110,6 +110,7 @@ cc_library(
       "//xls/common/status:status_macros",
       "//xls/delay_model:delay_estimator",
       "//xls/delay_model:delay_estimators",
+      "//xls/delay_model:analyze_critical_path",
       "//xls/ir:ir",
       "//xls/p5/util:load_json",
       "//xls/p5/util:nlohmann_json",

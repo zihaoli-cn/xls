@@ -15,8 +15,6 @@
 
 #include <string>
 
-ABSL_DECLARE_FLAG(std::string, sched_benchmark_name_prefix);
-
 namespace xls::p5 {
 
 class TestDelayEstimator : public DelayEstimator {
@@ -56,7 +54,10 @@ public:
 
   absl::Status Run();
 
-  std::string DumpCSV(bool print_vertical = true);
+  std::string DumpHWTransResult(bool print_vertical = true);
+  std::string DumpDataDepResult(bool print_vertical = true);
+
+  absl::Status AnalyzeDataDep();
 
   absl::Span<std::unique_ptr<Package>> packages() {
     return absl::MakeSpan(ir_);
@@ -91,7 +92,14 @@ private:
 
   std::vector<std::unique_ptr<Package>> ir_;
 
+  std::vector<absl::Duration> total_duration_;
+
   std::vector<int64_t> ir_nodes_;
+  std::vector<int64_t> ir_edges_;
+  std::vector<int64_t> ir_cp_nodes_;
+  std::vector<int64_t> ir_cp_delay_;
+  std::vector<int64_t> ir_params_;
+  std::vector<int64_t> ir_params_bitcount_;
 };
 
 } // namespace xls::p5

@@ -96,7 +96,12 @@ public:
   absl::optional<IfStmtOptions> if_opt = absl::nullopt;
   absl::optional<AssignStmtOptions> assign_opt = absl::nullopt;
 
-  MutaionOptions(int precision_factor) : precision_factor(precision_factor) {}
+  MutaionOptions(int precision_factor) : precision_factor(precision_factor) {
+    block_opt = absl::nullopt;
+    if_else_opt = absl::nullopt;
+    if_opt = absl::nullopt;
+    assign_opt = absl::nullopt;
+  }
 };
 
 class MutaionOptionsBuilder {

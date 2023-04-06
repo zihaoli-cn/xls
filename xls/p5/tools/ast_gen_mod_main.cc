@@ -36,7 +36,7 @@ namespace {
 const char *kUsage = R"(
 Example invocation for a particular function:
 
-  ast_gen_main path/to/p5ast.json
+  ast_gen_mod_main path/to/p5ast.json
 )";
 }
 
@@ -132,6 +132,7 @@ absl::StatusOr<nlohmann::json> RandomChangeJsonAst(
   return module->ToJson();
 }
 
+/*
 absl::Status RealMain(std::string_view filename, std::string_view prefix,
                       int samples, int precision, int min_stmt) {
   std::srand(std::time(0));
@@ -173,65 +174,54 @@ absl::Status RealMain(std::string_view filename, std::string_view prefix,
       for (int j = i + 1; j < samples; ++j) {
         if (generated_json[i] == generated_json[j]) {
           uf.Union(i, j);
-          /*
-          XLS_ASSIGN_OR_RETURN(std::unique_ptr<nlohmann::json> json_ptr,
-                               p5::LoadJson(filename));
+          //
+          //XLS_ASSIGN_OR_RETURN(std::unique_ptr<nlohmann::json> json_ptr,
+          //                     p5::LoadJson(filename));
 
-          XLS_ASSIGN_OR_RETURN(nlohmann::json changed_json,
-                               RandomChangeJsonAst(*json_ptr, precision + i));
-          generated_json[j] = changed_json.dump();
+          //XLS_ASSIGN_OR_RETURN(nlohmann::json changed_json,
+                               //RandomChangeJsonAst(*json_ptr, precision + i));
+          //generated_json[j] = changed_json.dump();
 
-          json_ptr.release();
+          //json_ptr.release();
 
-          changed = true;
-          */
-          std::cerr << absl::StrFormat("[%d, %d] duplicated", i, j)
-                    << std::endl;
-        }
-      }
-    }
-  }
-
-  std::cerr << absl::StrFormat("size = %d", uf.GetRepresentatives().size())
-            << std::endl;
-
-  int idx = 0;
-  for (int i : uf.GetRepresentatives()) {
-    std::ofstream(absl::StrFormat("%s%d.json", prefix, idx++), std::ios::out)
-        << generated_json[i];
-  }
-
-  return absl::OkStatus();
+          //changed = true;
+          //
+std::cerr << absl::StrFormat("[%d, %d] duplicated", i, j) << std::endl;
+}
+}
+}
 }
 
-/*
-absl::Status RealMain(std::string_view filename) {
+std::cerr << absl::StrFormat("size = %d", uf.GetRepresentatives().size())
+          << std::endl;
+
+int idx = 0;
+for (int i : uf.GetRepresentatives()) {
+  std::ofstream(absl::StrFormat("%s%d.json", prefix, idx++), std::ios::out)
+      << generated_json[i];
+}
+
+return absl::OkStatus();
+}
+*/
+
+absl::Status RealMain(std::string_view filename, std::string_view prefix,
+                      int samples, int precision, int min_stmt) {
   std::vector<p5::MutaionOptions> opt_list;
+  // opt_list.push_back(
+  //     p5::MutaionOptionsBuilder(100).SupportIf(25, 0).SupportIfElse(25, 0));
+  // opt_list.push_back(
+  //     p5::MutaionOptionsBuilder(100).SupportIf(30, 0).SupportIfElse(10, 70));
+  // opt_list.push_back(
+  //     p5::MutaionOptionsBuilder(100).SupportIf(10, 0).SupportIfElse(5, 100));
+  opt_list.push_back(
+      p5::MutaionOptionsBuilder(100).SupportStmtBlock(10, 10, 10, 5, 0));
+  opt_list.push_back(
+      p5::MutaionOptionsBuilder(100).SupportStmtBlock(15, 15, 15, 5, 5));
   opt_list.push_back(p5::MutaionOptionsBuilder(100)
-                         .SupportStmtBlock(20, 15, 20, 50, 30)
-                         .SupportIf(28, 80)
-                         .SupportIfElse(25, 80)
-                         .SupportAssign(30));
-  opt_list.push_back(p5::MutaionOptionsBuilder(1000)
-                         .SupportStmtBlock(400, 150, 150, 10, 30)
-                         .SupportIf(400, 200)
-                         .SupportIfElse(300, 500)
-                         .SupportAssign(290));
-  opt_list.push_back(p5::MutaionOptionsBuilder(1000)
-                         .SupportStmtBlock(550, 150, 15, 100, 200)
-                         .SupportIf(350, 200)
-                         .SupportIfElse(350, 400)
-                         .SupportAssign(400));
-  opt_list.push_back(p5::MutaionOptionsBuilder(1000)
-                         .SupportStmtBlock(45, 10, 15, 10, 300)
-                         .SupportIf(350, 650)
-                         .SupportIfElse(400, 800)
-                         .SupportAssign(700));
-  opt_list.push_back(p5::MutaionOptionsBuilder(1000)
-                         .SupportStmtBlock(45, 15, 15, 10, 30)
-                         .SupportIf(750, 100)
-                         .SupportIfElse(300, 400)
-                         .SupportAssign(100));
+                         .SupportStmtBlock(10, 10, 10, 5, 0)
+                         .SupportAssign(20));
+  opt_list.push_back(p5::MutaionOptionsBuilder(100).SupportAssign(40));
 
   for (int i = 0; i < opt_list.size(); ++i) {
     std::cerr << "iter-" << i << std::endl;
@@ -253,7 +243,6 @@ absl::Status RealMain(std::string_view filename) {
 
   return absl::OkStatus();
 }
-*/
 
 } // namespace xls
 int main(int argc, char *argv[]) {
