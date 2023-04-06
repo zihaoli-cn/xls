@@ -68,9 +68,16 @@ absl::Status TranslationBenchmark::Parse() {
   XLS_ASSIGN_OR_RETURN(std::unique_ptr<Module> ast_module,
                        ParseModuleFromJson(*json));
 
+  if (current_idx_ != json_ast_.size() || current_idx_ != cpp_ast_.size() ||
+      current_idx_ != parser_duration_.size()) {
+    return absl::InternalError("Invalid size");
+  }
+
   json_ast_.push_back(std::move(json));
   cpp_ast_.push_back(std::move(ast_module));
   parser_duration_.push_back(absl::Now() - start);
+
+  return absl::OkStatus();
 }
 
 absl::Status TranslationBenchmark::Translate() {
@@ -84,6 +91,16 @@ absl::Status TranslationBenchmark::Translate() {
     ir_counter += f->node_count();
   }
 
+  if (current_idx_ != cpp_ast_size_.size() ||
+      current_idx_ != transform_duration_.size() ||
+      current_idx_ != active_cpp_ast_size1_.size() ||
+      current_idx_ != analysis_duration_.size() ||
+      current_idx_ != active_cpp_ast_size2_.size() ||
+      current_idx_ != conversion_duration_.size() ||
+      current_idx_ != ir_.size() || current_idx_ != ir_nodes_.size()) {
+    return absl::InternalError("Invalid size");
+  }
+
   cpp_ast_size_.push_back(profiler.active_ast_num1);
   transform_duration_.push_back(profiler.tranform_duration);
   active_cpp_ast_size1_.push_back(profiler.active_ast_num2);
@@ -92,5 +109,17 @@ absl::Status TranslationBenchmark::Translate() {
   conversion_duration_.push_back(profiler.conversion_duration);
   ir_.push_back(std::move(ir_package));
   ir_nodes_.push_back(ir_counter);
+
+  return absl::OkStatus();
+}
+
+absl::Status TranslationBenchmark::Run() {
+  for (int i = 0; i < num_sample_; ++i) {
+    XLS_RETURN_IF_ERROR(Parse());
+    XLS_RETURN_IF_ERROR(Translate());
+    ++current_idx_;
+  }
+
+  return absl::OkStatus();
 }
 } // namespace xls::p5
