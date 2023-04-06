@@ -1,6 +1,8 @@
 #include "xls/p5/benchmark.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/str_join.h"
 #include "absl/types/variant.h"
 
 #include "xls/common/file/filesystem.h"
@@ -125,7 +127,7 @@ absl::Status TranslationBenchmark::Run() {
   return absl::OkStatus();
 }
 
-std::string DumpCSV(bool print_vertical = true) {
+std::string TranslationBenchmark::DumpCSV(bool print_vertical) {
   std::string result;
 
   std::vector<std::string> headers = {"ID",          "Parser运行时间",
@@ -179,7 +181,7 @@ std::string DumpCSV(bool print_vertical = true) {
 
     for (int idx = 0; idx < headers.size(); ++idx) {
       const VectorPtrType &vec = vector_of_vector[idx];
-      resutl += absl::StrFormat("%s,%s\n", headers[idx], vec2line(vec, ","));
+      result += absl::StrFormat("%s,%s\n", headers[idx], vec2line(vec));
     }
   } else {
     // Print horizontally.
@@ -191,12 +193,12 @@ std::string DumpCSV(bool print_vertical = true) {
         // Deal with `vector_of_vector[col][row]`.
         const VectorPtrType &colonm = vector_of_vector[col];
 
-        if (std::holds_alternative<std::vector<absl::Duration> *>(colonm)) {
-          auto colonm_d_ptr = std::get<std::vector<absl::Duration> *>(colonm);
+        if (absl::holds_alternative<std::vector<absl::Duration> *>(colonm)) {
+          auto colonm_d_ptr = absl::get<std::vector<absl::Duration> *>(colonm);
 
           result += absl::FormatDuration(colonm_d_ptr->at(row));
         } else {
-          auto colonm_num_ptr = std::get<std::vector<absl::int64_t> *>(colonm);
+          auto colonm_num_ptr = absl::get<std::vector<int64_t> *>(colonm);
 
           result += std::to_string(colonm_num_ptr->at(row));
         }
