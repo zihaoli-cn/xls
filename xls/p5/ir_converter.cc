@@ -3,23 +3,23 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
+
 #include "boost/icl/discrete_interval.hpp"
 #include "boost/icl/interval_set.hpp"
 #include "boost/icl/split_interval_set.hpp"
+
 #include "xls/common/logging/logging.h"
 #include "xls/ir/bits.h"
 #include "xls/ir/function_builder.h"
 #include "xls/ir/lsb_or_msb.h"
 #include "xls/ir/source_location.h"
+
 #include <algorithm>
 #include <initializer_list>
 #include <iterator>
-#include <map>
-#include <set>
-#include <vector>
 
 namespace xls::p5 {
-namespace {
+
 // Base class for Doing analysis on AST
 //   send the `AnalysisResultType` pointer to the constructor
 //   call `Run` to conduct analysis
@@ -163,23 +163,6 @@ public:
   }
 };
 
-// Collect those Field-Access Expr
-struct FieldAccessLoweringInfo {
-  using FieldAccessMap =
-      std::map<FieldAccessExpr *,
-               BitSliceExpr *>; // map orignal AST node to lowered AST node
-  using NamingMap =
-      std::map<BitSliceExpr *,
-               std::string>; // map lowered AST node to a readable name
-
-  std::set<FieldAccessExpr *>
-      field_accesses; // orginal Field-Access Expr AST Node
-  std::set<FakeVarDef *>
-      defs; // generated fake variables' def. for struct object
-  FieldAccessMap field_access_map;
-  NamingMap readable_name_map; // give BitSliceExpr a readable name
-};
-
 // Convert `a.b.c.d` to variable `a`'s bit-slice
 class FieldAccessElimination : public VisitAll {
 public:
@@ -279,16 +262,6 @@ FieldAccessEliminationVerify::VisitFieldAccessExpr(FieldAccessExpr *expr) {
       expr->ToString(2, 0)));
 }
 
-// Collect those Array-Index Expr
-struct ArrayIndexLoweringInfo {
-  using ArrIndexMap = std::map<ArrIndexExpr *, VarRefExpr *>;
-
-  std::set<ArrIndexExpr *> arr_indexes;
-  std::set<FakeVarDef *>
-      defs; // generated fake variables' def. for Array Index usage
-  ArrIndexMap index_map;
-};
-
 // Convert `arr[x]` to a Dummy Variable Reference : `arr_x`
 class ArrayAccessElimination : public VisitAll {
 public:
@@ -358,24 +331,6 @@ ArrayAccessEliminationVerify::VisitArrIndexExpr(ArrIndexExpr *node) {
       "Should not exist this kind of AstNodeAfter `ArrayAccessElimination`: ",
       node->ToString(2, 0)));
 }
-
-// Collect those variables that need valid bit
-struct ValidBitLoweringInfo {
-  using ValidCallsiteMap = std::map<BuiltinCallExpr *, VarRefExpr *>;
-  using ValidSetCallsiteMap = std::map<ExprEvalStmt *, AssignStmt *>;
-  using VarNameRefPtr = absl::variant<NameRefExpr *, VarRefExpr *>;
-
-  std::set<BuiltinCallExpr *> valid_callsites;
-  ValidCallsiteMap valid_map;
-
-  std::set<ExprEvalStmt *> valid_set_callsites;
-  ValidSetCallsiteMap valid_set_map;
-
-  std::set<VarNameRefPtr> refs; // orginal variables' names
-  std::map<VarNameRefPtr, FakeVarDef *>
-      ref2bit; // map variable's name reference to its valid-bit defination
-  std::set<FakeVarDef *> defs; // generated fake variables' def. for valid bit
-};
 
 // Convert `_valid_set(a, true);` to `a = true;` assignment
 //   and convert `_valid(a)` to a Dummy Variable Reference : `a_x_valid`
@@ -538,17 +493,6 @@ ValidAndVaildSetEliminationVerify::VisitBuiltinCallExpr(BuiltinCallExpr *node) {
   return absl::OkStatus();
 }
 
-// Collect those remaining NameRefExpr
-struct NameRefLoweringInfo {
-  using NameRefMap =
-      std::map<NameRefExpr *,
-               VarRefExpr *>; // map orignal AST node to lowered AST node
-
-  std::set<NameRefExpr *> name_refs; // orginal NameRefExpr AST Node
-  std::set<FakeVarDef *> defs;       // generated fake variables' def
-  NameRefMap name_ref_map;
-};
-
 // Replace NameRef to VarRef
 class NameRefElimation : public VisitAll {
 public:
@@ -606,16 +550,6 @@ absl::Status NameRefElimationVerify::VisitNameRefExpr(NameRefExpr *node) {
       "Should not exist this kind of AstNodeAfter `NameRefElimation`: ",
       node->ToString(2, 0)));
 }
-
-// Collect those Nested BitSlice Expr
-struct NestedSliceLoweringInfo {
-  using NestedSliceMap =
-      std::map<BitSliceExpr *,
-               BitSliceExpr *>; // map orignal AST node to lowered AST node
-
-  std::set<BitSliceExpr *> nested_slices;
-  NestedSliceMap nested_slice_map;
-};
 
 // Replace `a[59:10][39:20][9:0]` to `a[59:10][29:20]` then to `a[39:30]`
 class NestedSliceElimation : public VisitAll {
@@ -694,18 +628,6 @@ public:
   }
 };
 
-struct LoweringInfo {
-  FieldAccessLoweringInfo field_access;
-  ArrayIndexLoweringInfo arr_idx;
-  ValidBitLoweringInfo valid_bit;
-  NameRefLoweringInfo name_ref;
-  NestedSliceLoweringInfo nested_slice;
-};
-
-// Doing different kind of lowering transform to Module
-//  BE CAREFUL!
-//    Because of the implementation detail, you can't change the
-//    sequence of lowering procedures
 absl::Status LoweringTransform(LoweringInfo *info, Module *module,
                                const std::string &delimiter, bool need_verify,
                                xls::p5::LoweringMappingRel *mapping) {
@@ -745,7 +667,7 @@ absl::Status LoweringTransform(LoweringInfo *info, Module *module,
     XLS_RETURN_IF_ERROR(verify3.VisitModule(module));
     NameRefElimationVerify verify4;
     XLS_RETURN_IF_ERROR(verify4.VisitModule(module));
-    
+
     UselessBlockEliminationVerify verfy_no_useless_block;
     XLS_RETURN_IF_ERROR(verfy_no_useless_block.VisitModule(module));
     NestedIfStmtEliminationVerify verify_no_nested_if;
@@ -998,10 +920,6 @@ void AllocateSizeForCurrentlyUnknown(const std::set<FakeVarDef *> &variables,
 */
 
 using namespace boost::icl;
-using LiveRange = std::pair<uint32_t, uint32_t>;
-using LiveRanges = std::vector<LiveRange>;
-using LiveRangesMapPtrPair = std::pair<std::map<FakeVarDef *, LiveRanges> *,
-                                       std::map<FakeVarDef *, LiveRanges> *>;
 
 class VarLiveRangesAnalysis : public AstAnalysisVisitor<LiveRangesMapPtrPair> {
 private:
@@ -1085,67 +1003,45 @@ public:
   }
 };
 
-// All analysis information that are used for translation
-//   - all global/local variables are gathered together in `variables`
-//   - all return-stmts' hint conditions are predicted in `exits_predict_expr`
-//   - the variables that each stmt may modify are saved in `stmt_modified_vars`
-//   - all variable's size are known, i.e., FakeVarDef's size should not be
-//      absl::nullopt
-//      note that currently they are inferenced or generated to a fix size = 64
-//      bit
-struct AstAnalysisInformation {
-  explicit AstAnalysisInformation(StmtBlock *func_body) {
-    // collect all live variables
-    LiveVarCollection analysis1(&variables);
-    auto status = analysis1.Run(func_body);
+absl::Status AstAnalysisInformation::Analyze(StmtBlock *func_body) {
+  // collect all live variables
+  LiveVarCollection analysis1(&variables);
+  XLS_RETURN_IF_ERROR(analysis1.Run(func_body));
 
-    // filter those global variables
-    std::copy_if(variables.begin(), variables.end(),
-                 std::back_inserter(global_vars),
-                 [](FakeVarDef *def) { return def->is_global(); });
+  // filter those global variables
+  std::copy_if(variables.begin(), variables.end(),
+               std::back_inserter(global_vars),
+               [](FakeVarDef *def) { return def->is_global(); });
 
-    // filter those local variables
-    std::copy_if(variables.begin(), variables.end(),
-                 std::back_inserter(local_vars),
-                 [](FakeVarDef *def) { return !def->is_global(); });
+  // filter those local variables
+  std::copy_if(variables.begin(), variables.end(),
+               std::back_inserter(local_vars),
+               [](FakeVarDef *def) { return !def->is_global(); });
 
-    XLS_LOG(INFO) << "Global Variables count : " << global_vars.size();
-    XLS_LOG(INFO) << "Local Variables count : " << local_vars.size();
-    for (auto def : variables) {
-      XLS_LOG(INFO) << def->name() << ", is global : " << def->is_global()
-                    << ", size : " << def->size().value();
-    }
-
-    auto args = std::make_pair(&fine_graned_ranges, &coarse_graned_ranges);
-    VarLiveRangesAnalysis live_range_analysis(&args);
-    status.Update(live_range_analysis.Run(func_body));
-
-    ExitPredictionAnalysis analysis2(&exits_predict_expr);
-    status.Update(analysis2.Run(func_body));
-
-    StmtModifiedVarAnalysis analysis3(&stmt_modified_vars);
-    status.Update(analysis3.Run(func_body));
-
-    VarSizeInference analysis4;
-    status.Update(analysis4.Run(func_body));
-    // AllocateSizeForCurrentlyUnknown(variables, 64);
-
-    XLS_LOG_IF(FATAL, !status.ok()) << status;
+  XLS_LOG(INFO) << "Global Variables count : " << global_vars.size();
+  XLS_LOG(INFO) << "Local Variables count : " << local_vars.size();
+  for (auto def : variables) {
+    XLS_LOG(INFO) << def->name() << ", is global : " << def->is_global()
+                  << ", size : " << def->size().value();
   }
 
-  std::set<FakeVarDef *> variables;
-  std::vector<FakeVarDef *> global_vars;
-  std::vector<FakeVarDef *> local_vars;
+  // TODO: Unsupported
+  // auto args = std::make_pair(&fine_graned_ranges, &coarse_graned_ranges);
+  // VarLiveRangesAnalysis live_range_analysis(&args);
+  // XLS_RETURN_IF_ERROR(live_range_analysis.Run(func_body));
 
-  // combine fine-grained live ranges, can get the coarse-grained live ranges
-  std::map<FakeVarDef *, LiveRanges>
-      fine_graned_ranges; // fine-grained live range
-  std::map<FakeVarDef *, LiveRanges>
-      coarse_graned_ranges; // coarse-grained live range
+  ExitPredictionAnalysis analysis2(&exits_predict_expr);
+  XLS_RETURN_IF_ERROR(analysis2.Run(func_body));
 
-  std::vector<std::pair<ReturnStmt *, Expr *>> exits_predict_expr;
-  std::map<Stmt *, std::set<FakeVarDef *>> stmt_modified_vars;
-};
+  StmtModifiedVarAnalysis analysis3(&stmt_modified_vars);
+  XLS_RETURN_IF_ERROR(analysis3.Run(func_body));
+
+  VarSizeInference analysis4;
+  XLS_RETURN_IF_ERROR(analysis4.Run(func_body));
+  // AllocateSizeForCurrentlyUnknown(variables, 64);
+
+  return absl::OkStatus();
+}
 
 // description global context, i.e., the value of the global variables
 using ContextType = std::vector<BValue>;
@@ -1760,15 +1656,49 @@ BValue P5ActionIrConverter::VisitBuiltinCallExpr(
   return result;
 }
 
-} // namespace
 absl::StatusOr<std::unique_ptr<Package>>
-ConvertP5AstModuleToPackage(Module *ast_module, LoweringMappingRel *mapping) {
+ConvertP5AstModuleToPackage(Module *ast_module, LoweringMappingRel *mapping,
+                            IrConverterProfiler *profiler) {
+  absl::Time transform_start;
+  absl::Time analysis_start;
+  absl::Time conversion_start;
+  if (profiler) {
+    absl::flat_hash_set<AstNode *> active_nodes;
+    ast_module->CollectActiveNodes(active_nodes);
+
+    profiler->active_ast_num1 = active_nodes.size();
+
+    transform_start = absl::Now();
+  }
   LoweringInfo lowering_info;
   XLS_RETURN_IF_ERROR(LoweringTransform(&lowering_info, ast_module,
                                         /* delimiter */ ".",
                                         /*should verify*/ true, mapping));
 
-  AstAnalysisInformation analysis(ast_module->body);
+  if (profiler) {
+    profiler->tranform_duration = absl::Now() - transform_start;
+
+    absl::flat_hash_set<AstNode *> active_nodes;
+    ast_module->CollectActiveNodes(active_nodes);
+
+    profiler->active_ast_num2 = active_nodes.size();
+
+    analysis_start = absl::Now();
+  }
+
+  AstAnalysisInformation analysis;
+  analysis.Analyze(ast_module->body);
+
+  if (profiler) {
+    profiler->analysis_duration = absl::Now() - analysis_start;
+
+    absl::flat_hash_set<AstNode *> active_nodes;
+    ast_module->CollectActiveNodes(active_nodes);
+
+    profiler->active_ast_num3 = active_nodes.size();
+
+    conversion_start = absl::Now();
+  }
 
   constexpr auto func_name = "action";
   constexpr auto package_name = "p5";
@@ -1782,6 +1712,10 @@ ConvertP5AstModuleToPackage(Module *ast_module, LoweringMappingRel *mapping) {
   if (!function.ok()) {
     XLS_LOG(WARNING) << "Fail to convert an action: " << function.status();
     return function.status();
+  }
+
+  if (profiler) {
+    profiler->conversion_duration = absl::Now() - conversion_start;
   }
 
   return std::move(package);
