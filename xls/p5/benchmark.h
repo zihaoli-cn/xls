@@ -56,6 +56,8 @@ public:
 
   absl::Status Run();
 
+  std::string DumpCSV(bool print_vertical = true);
+
 private:
   std::string GetCurrentFileName() const;
   absl::Status Parse();

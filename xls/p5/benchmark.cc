@@ -1,8 +1,10 @@
 #include "xls/p5/benchmark.h"
 
 #include "absl/strings/str_format.h"
+#include "absl/types/variant.h"
 
 #include "xls/common/file/filesystem.h"
+#include "xls/common/visitor.h"
 #include "xls/ir/function.h"
 #include "xls/p5/ir_converter.h"
 #include "xls/p5/json_ast_parser.h"
@@ -121,5 +123,89 @@ absl::Status TranslationBenchmark::Run() {
   }
 
   return absl::OkStatus();
+}
+
+std::string DumpCSV(bool print_vertical = true) {
+  std::string result;
+
+  std::vector<std::string> headers = {"ID",          "Parser运行时间",
+                                      "活跃AST数量", "Transformation运行时间",
+                                      "活跃AST数量", "Analysis运行时间",
+                                      "活跃AST数量", "Translation运行时间",
+                                      "IR节点数量"};
+
+  std::vector<int64_t> id_vec;
+  id_vec.reserve(num_sample_);
+
+  for (int i = 0; i < num_sample_; ++i) {
+    id_vec.push_back(i);
+  }
+
+  using VectorPtrType =
+      absl::variant<std::vector<absl::Duration> *, std::vector<int64_t> *>;
+
+  std::vector<VectorPtrType> vector_of_vector;
+  vector_of_vector.reserve(headers.size());
+  {
+    vector_of_vector.push_back(&id_vec);
+    vector_of_vector.push_back(&parser_duration_);
+    vector_of_vector.push_back(&cpp_ast_size_);
+    vector_of_vector.push_back(&transform_duration_);
+    vector_of_vector.push_back(&active_cpp_ast_size1_);
+    vector_of_vector.push_back(&analysis_duration_);
+    vector_of_vector.push_back(&active_cpp_ast_size2_);
+    vector_of_vector.push_back(&conversion_duration_);
+    vector_of_vector.push_back(&ir_nodes_);
+  }
+
+  if (print_vertical) {
+    // Print vertically.
+    auto vec2line = [=](const VectorPtrType &vec) -> std::string {
+      return absl::visit(
+          Visitor{[=](std::vector<absl::Duration> *vec_d) -> std::string {
+                    return absl::StrJoin(
+                        *vec_d, ",", [=](std::string *out, absl::Duration d) {
+                          absl::StrAppend(out, absl::FormatDuration(d));
+                        });
+                  },
+                  [=](std::vector<int64_t> *vec_num) -> std::string {
+                    return absl::StrJoin(
+                        *vec_num, ",", [=](std::string *out, int64_t num) {
+                          absl::StrAppend(out, std::to_string(num));
+                        });
+                  }},
+          vec);
+    };
+
+    for (int idx = 0; idx < headers.size(); ++idx) {
+      const VectorPtrType &vec = vector_of_vector[idx];
+      resutl += absl::StrFormat("%s,%s\n", headers[idx], vec2line(vec, ","));
+    }
+  } else {
+    // Print horizontally.
+    result += absl::StrFormat("%s\n", absl::StrJoin(headers, ","));
+
+    for (int row = 0; row < num_sample_; ++row) {
+      // Deal withn `vector_of_vector[:][row]`.
+      for (int col = 0; col < headers.size(); ++col) {
+        // Deal with `vector_of_vector[col][row]`.
+        const VectorPtrType &colonm = vector_of_vector[col];
+
+        if (std::holds_alternative<std::vector<absl::Duration> *>(colonm)) {
+          auto colonm_d_ptr = std::get<std::vector<absl::Duration> *>(colonm);
+
+          result += absl::FormatDuration(colonm_d_ptr->at(row));
+        } else {
+          auto colonm_num_ptr = std::get<std::vector<absl::int64_t> *>(colonm);
+
+          result += std::to_string(colonm_num_ptr->at(row));
+        }
+
+        result += (col + 1 == headers.size()) ? "\n" : ",";
+      }
+    }
+  }
+
+  return result;
 }
 } // namespace xls::p5

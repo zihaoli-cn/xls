@@ -106,6 +106,7 @@ cc_library(
       ":ir_converter",
       ":json_ast_parser",
       "//xls/common/file:filesystem",
+      "//xls/common:visitor",
       "//xls/common/status:status_macros",
       "//xls/delay_model:delay_estimator",
       "//xls/delay_model:delay_estimators",
@@ -117,5 +118,6 @@ cc_library(
       "@com_google_absl//absl/status:statusor",
       "@com_google_absl//absl/strings:str_format",
       "@com_google_absl//absl/time",
+      "@com_google_absl//absl/types:variant",
       ],
 )
