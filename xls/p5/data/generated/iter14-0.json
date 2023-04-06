@@ -1,0 +1,53 @@
+{
+    "OP0": {
+        "STRING": "QoKXAD_tYKKQGmQAJQL",
+        "TYNAME": "IDENT"
+    },
+    "OP1": {
+        "TYNAME": "LIST",
+        "VALUES": [
+            {
+                "OP0": {
+                    "OP0": {
+                        "GLOBAL": 1,
+                        "OFFSET": 49,
+                        "OP0": {
+                            "GLOBAL": 1,
+                            "OFFSET": 0,
+                            "OP0": {
+                                "GLOBAL": 1,
+                                "SIZE": 288,
+                                "STRING": "V_QlQWAqKHU",
+                                "TYNAME": "IDENT"
+                            },
+                            "OP1": {
+                                "STRING": "nEQGJ",
+                                "TYNAME": "IDENT"
+                            },
+                            "SIZE": 125,
+                            "STRUCT": "V_QlQWAqKHU",
+                            "TYNAME": "DOT"
+                        },
+                        "OP1": {
+                            "STRING": "gSvACC",
+                            "TYNAME": "IDENT"
+                        },
+                        "SIZE": 1,
+                        "STRUCT": "V_QlQWAqKHU",
+                        "TYNAME": "DOT"
+                    },
+                    "OP1": {
+                        "INT": "1",
+                        "TYNAME": "INT_LIT"
+                    },
+                    "TYNAME": "EQ"
+                },
+                "OP1": {
+                    "TYNAME": "RETURN"
+                },
+                "TYNAME": "IF"
+            }
+        ]
+    },
+    "TYNAME": "BLOCK"
+}
