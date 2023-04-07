@@ -136,6 +136,7 @@ cc_binary(
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+        "//xls/common/file:filesystem",
         "//xls/common:init_xls",
         "//xls/common/logging:log_flags",
         "//xls/common/logging:logging",

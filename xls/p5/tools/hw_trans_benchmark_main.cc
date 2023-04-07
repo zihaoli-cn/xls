@@ -2,6 +2,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 
+#include "xls/common/file/filesystem.h"
 #include "xls/common/init_xls.h"
 #include "xls/common/logging/log_flags.h"
 #include "xls/common/logging/logging.h"
@@ -21,6 +22,9 @@ ABSL_FLAG(bool, print_vertical, true, "print benchmark's result vertically");
 
 ABSL_FLAG(std::string, prefix, "bench", "P5 Json file's name prefix");
 
+ABSL_FLAG(std::string, json_depth_prefix, "xls/p5/data/json_depth/series",
+          "P5 Json depth prefix file's preifx");
+
 namespace xls {
 namespace {
 const char *kUsage = R"(
@@ -33,7 +37,8 @@ Example invocation for a particular function:
 }
 
 absl::Status RealMain(const std::string &benchmark_dir,
-                      const std::string &prefix, bool print_vertical) {
+                      const std::string &prefix, bool print_vertical,
+                      const std::string &json_depth_prefix) {
 
   XLS_ASSIGN_OR_RETURN(int32_t size,
                        p5::CheckBenchmarkSize(benchmark_dir, prefix));
@@ -42,6 +47,9 @@ absl::Status RealMain(const std::string &benchmark_dir,
 
   p5::TranslationBenchmark benchmark(benchmark_dir, prefix, size);
   XLS_RETURN_IF_ERROR(benchmark.Run());
+
+  std::vector<size_t> idx_vec = {2, 3, 4};
+  benchmark.SaveJsonDepthSeries(idx_vec, json_depth_prefix);
 
   std::cout << benchmark.DumpJsonStatistics(print_vertical) << std::endl;
 
@@ -60,7 +68,9 @@ int main(int argc, char **argv) {
   std::string benchmark_dir = absl::GetFlag(FLAGS_benchmark_dir);
   std::string prefix = absl::GetFlag(FLAGS_prefix);
   bool print_vertical = absl::GetFlag(FLAGS_print_vertical);
+  std::string json_depth_prefix = absl::GetFlag(FLAGS_json_depth_prefix);
 
-  XLS_QCHECK_OK(xls::RealMain(benchmark_dir, prefix, print_vertical));
+  XLS_QCHECK_OK(
+      xls::RealMain(benchmark_dir, prefix, print_vertical, json_depth_prefix));
   return EXIT_SUCCESS;
 }
