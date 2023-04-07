@@ -310,13 +310,13 @@ absl::Status TranslationBenchmark::AnalyzeDataDep() {
 std::string TranslationBenchmark::DumpDataDepResult(bool print_vertical) {
   std::string result;
 
-  std::vector<std::string> headers = {"ID",
-                                      "数据依赖图节点数",
-                                      "数据依赖图有向边数",
-                                      "关键路径上节点数",
-                                      "关键路径上总时延",
-                                      "参数数量",
-                                      "参数总位宽"};
+  std::vector<std::string> headers = {"\"ID\"",
+                                      "\"数据依赖图节点数\"",
+                                      "\"数据依赖图有向边数\"",
+                                      "\"关键路径上节点数\"",
+                                      "\"关键路径上总时延\"",
+                                      "\"参数数量\"",
+                                      "\"参数总位宽\""};
 
   std::vector<int64_t> id_vec;
   id_vec.reserve(num_sample_);
