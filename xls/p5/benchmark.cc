@@ -181,7 +181,11 @@ std::string DumpTable(size_t num_sample,
                     return absl::StrJoin(
                         *vec_d, elem_sep,
                         [=](std::string *out, absl::Duration d) {
-                          absl::StrAppend(out, absl::FormatDuration(d));
+                          absl::StrAppend(
+                              out,
+                              absl::StrFormat("\"%s\"",
+                                              absl::FormatDuration(absl::Trunc(
+                                                  d, absl::Microseconds(10)))));
                         });
                   },
                   [=](std::vector<int64_t> *vec_num) -> std::string {
@@ -212,7 +216,9 @@ std::string DumpTable(size_t num_sample,
         if (absl::holds_alternative<std::vector<absl::Duration> *>(colonm)) {
           auto colonm_d_ptr = absl::get<std::vector<absl::Duration> *>(colonm);
 
-          result += absl::FormatDuration(colonm_d_ptr->at(row));
+          result += absl::StrFormat(
+              "\"%s\"", absl::FormatDuration(absl::Trunc(
+                            colonm_d_ptr->at(row), absl::Microseconds(10))));
         } else {
           auto colonm_num_ptr = absl::get<std::vector<int64_t> *>(colonm);
 
