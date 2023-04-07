@@ -5,9 +5,10 @@
 #include "absl/strings/str_join.h"
 #include "absl/types/variant.h"
 
-#include "xls/common/file/filesystem.h"
 #include "xls/common/logging/logging.h"
+#include "xls/common/status/status_macros.h"
 #include "xls/common/visitor.h"
+
 #include "xls/delay_model/analyze_critical_path.h"
 #include "xls/ir/function.h"
 #include "xls/p5/ir_converter.h"
@@ -396,5 +397,29 @@ std::string TranslationBenchmark::DumpJsonStatistics(bool print_vertical) {
 
   return DumpTable(num_sample_, headers, vector_of_vector, print_vertical, ",",
                    "\n");
+}
+
+absl::Status TranslationBenchmark::SaveJsonDepthSeries(
+    const std::vector<size_t> &idx_vec,
+    const std::filesystem::path &output_file_prefix) {
+  XLS_CHECK(profile_json_);
+
+  std::string content;
+  for (auto i : idx_vec) {
+    XLS_CHECK(i < json_info_.size());
+    std::filesystem::path path = output_file_prefix;
+    path += absl::StrFormat("%llu.txt", i);
+
+    auto &profiler = json_info_.at(i);
+
+    content.clear();
+    content = absl::StrJoin(profiler.depth_series, ",",
+                            [=](std::string *out, int64_t v) {
+                              return absl::StrAppend(out, std::to_string(v));
+                            });
+
+    XLS_RETURN_IF_ERROR(SetFileContents(path, content));
+  }
+  return absl::OkStatus();
 }
 } // namespace xls::p5

@@ -6,6 +6,7 @@
 #include "absl/status/statusor.h"
 #include "absl/time/time.h"
 
+#include "xls/common/file/filesystem.h"
 #include "xls/delay_model/delay_estimator.h"
 #include "xls/delay_model/delay_estimators.h"
 #include "xls/ir/package.h"
@@ -15,6 +16,7 @@
 #include "xls/p5/util/load_json.h"
 
 #include <string>
+#include <vector>
 
 namespace xls::p5 {
 
@@ -58,8 +60,9 @@ public:
 
   std::string DumpJsonStatistics(bool print_vertical = true);
 
-  // TODO
-  //  std::string DumpJsonDepthSerise();
+  absl::Status
+  SaveJsonDepthSeries(const std::vector<size_t> &idx_vec,
+                      const std::filesystem::path &output_file_prefix);
 
   std::string DumpHWTransTime(bool print_vertical = true);
   std::string DumpDataDepResult(bool print_vertical = true);
