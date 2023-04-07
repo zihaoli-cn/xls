@@ -61,6 +61,7 @@ LoadJsonWithProfile(std::string_view filename, JsonProfiler *profiler) {
     } else if (event == nlohmann::detail::parse_event_t::array_start) {
       ++profiler->array;
     }
+    ++profiler->total;
     profiler->max_depth = std::max(profiler->max_depth, (int64_t)depth);
     profiler->depth_series.push_back(depth);
 

@@ -319,7 +319,8 @@ std::string TranslationBenchmark::DumpDataDepResult(bool print_vertical) {
 std::string TranslationBenchmark::DumpJsonStatistics(bool print_vertical) {
   std::string result;
 
-  std::vector<std::string> headers = {"ID", "Object", "Key", "Value", "Array"};
+  std::vector<std::string> headers = {"\"ID\"",    "\"Object\"", "\"Key\"",
+                                      "\"Value\"", "\"Array\"",  "\"Total\""};
 
   std::vector<int64_t> id_vec;
 
@@ -327,6 +328,7 @@ std::string TranslationBenchmark::DumpJsonStatistics(bool print_vertical) {
   std::vector<int64_t> key_vec;
   std::vector<int64_t> val_vec;
   std::vector<int64_t> arr_vec;
+  std::vector<int64_t> total_vec;
 
   id_vec.reserve(num_sample_);
 
@@ -334,6 +336,7 @@ std::string TranslationBenchmark::DumpJsonStatistics(bool print_vertical) {
   key_vec.reserve(num_sample_);
   val_vec.reserve(num_sample_);
   arr_vec.reserve(num_sample_);
+  total_vec.reserve(num_sample_);
 
   for (int i = 0; i < num_sample_; ++i) {
     id_vec.push_back(i);
@@ -342,6 +345,7 @@ std::string TranslationBenchmark::DumpJsonStatistics(bool print_vertical) {
     key_vec.push_back(json_info_.at(i).key);
     val_vec.push_back(json_info_.at(i).value);
     arr_vec.push_back(json_info_.at(i).array);
+    total_vec.push_back(json_info_.at(i).total);
   }
 
   std::vector<VectorPtrType> vector_of_vector;
@@ -353,6 +357,7 @@ std::string TranslationBenchmark::DumpJsonStatistics(bool print_vertical) {
     vector_of_vector.push_back(&key_vec);
     vector_of_vector.push_back(&val_vec);
     vector_of_vector.push_back(&arr_vec);
+    vector_of_vector.push_back(&total_vec);
   }
 
   return DumpTable(num_sample_, headers, vector_of_vector, print_vertical, ",",

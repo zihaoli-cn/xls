@@ -14,6 +14,7 @@ struct JsonProfiler {
     key = 0;
     value = 0;
     array = 0;
+    total = 0;
     max_depth = 0;
   }
 
@@ -21,6 +22,7 @@ struct JsonProfiler {
   int64_t key;
   int64_t value;
   int64_t array;
+  int64_t total;
   int64_t max_depth;
   std::vector<int64_t> depth_series;
 };
