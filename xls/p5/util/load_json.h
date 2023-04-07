@@ -1,22 +1,18 @@
 
 #pragma once
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/status/statusor.h"
+
 #include "xls/p5/util/json.hpp"
 #include <memory>
+#include <string>
 #include <string_view>
 #include <vector>
 namespace xls::p5 {
 
 struct JsonProfiler {
-  JsonProfiler() {
-    object = 0;
-    key = 0;
-    value = 0;
-    array = 0;
-    total = 0;
-    max_depth = 0;
-  }
+  JsonProfiler();
 
   int64_t object;
   int64_t key;
@@ -24,6 +20,15 @@ struct JsonProfiler {
   int64_t array;
   int64_t total;
   int64_t max_depth;
+
+  int64_t expr_count;
+  int64_t stmt_count;
+  int64_t meta_count;
+  int64_t ident_count;
+
+  absl::flat_hash_set<std::string> expr_tyname;
+  absl::flat_hash_set<std::string> stmt_tyname;
+
   std::vector<int64_t> depth_series;
 };
 

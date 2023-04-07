@@ -2,6 +2,7 @@
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "xls/common/logging/logging.h"
+#include "xls/p5/keywords.h"
 
 #include <algorithm>
 #include <fstream>
@@ -11,6 +12,27 @@
 #include <string>
 namespace xls::p5 {
 
+JsonProfiler::JsonProfiler() {
+  object = 0;
+  key = 0;
+  value = 0;
+  array = 0;
+  total = 0;
+  max_depth = 0;
+
+  expr_count = 0;
+  stmt_count = 0;
+  meta_count = 0;
+  ident_count = 0;
+
+  for (auto tyname : GetExprTypeNames()) {
+    expr_tyname.insert(tyname);
+  }
+
+  for (auto tyname : GetStmtTypeNames()) {
+    stmt_tyname.insert(tyname);
+  }
+}
 namespace {
 absl::StatusOr<std::unique_ptr<nlohmann::json>>
 LoadJsonWithoutProfile(std::string_view filename) {
@@ -58,6 +80,18 @@ LoadJsonWithProfile(std::string_view filename, JsonProfiler *profiler) {
       ++profiler->key;
     } else if (event == nlohmann::detail::parse_event_t::value) {
       ++profiler->value;
+      if (parsed.is_string()) {
+        std::string str = parsed.get<std::string>();
+        if (str == "IDENT") {
+          ++profiler->ident_count;
+        } else if (profiler->expr_tyname.contains(str)) {
+          ++profiler->expr_count;
+        } else if (profiler->stmt_tyname.contains(str)) {
+          ++profiler->stmt_count;
+        } else if (str == "LIST" || str == "ANNOTATION") {
+          ++profiler->meta_count;
+        }
+      }
     } else if (event == nlohmann::detail::parse_event_t::array_start) {
       ++profiler->array;
     }
