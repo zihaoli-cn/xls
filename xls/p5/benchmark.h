@@ -51,7 +51,8 @@ absl::StatusOr<int32_t> CheckBenchmarkSize(const std::string &benchmark_dir,
 class TranslationBenchmark {
 public:
   TranslationBenchmark(const std::string &benchmark_dir,
-                       const std::string &prefix, int32_t num_sample);
+                       const std::string &prefix, int32_t num_sample,
+                       bool profile_json = false);
 
   absl::Status Run();
 
@@ -74,6 +75,7 @@ private:
   absl::Status Parse();
   absl::Status Translate();
 
+  bool profile_json_;
   const std::string benchmark_dir_;
   const std::string prefix_;
   const int32_t num_sample_;
@@ -84,6 +86,7 @@ private:
 
   std::vector<std::unique_ptr<nlohmann::json>> json_ast_;
   std::vector<std::unique_ptr<Module>> cpp_ast_;
+  std::vector<absl::Duration> load_json_duration_;
   std::vector<absl::Duration> parser_duration_;
 
   std::vector<int64_t> cpp_ast_size_;
@@ -100,6 +103,8 @@ private:
 
   std::vector<std::unique_ptr<Package>> ir_;
 
+  std::vector<absl::Duration> pre_staff_duration_;
+  std::vector<absl::Duration> real_staff_duration_;
   std::vector<absl::Duration> total_duration_;
 
   std::vector<int64_t> ir_nodes_;

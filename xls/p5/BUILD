@@ -107,6 +107,7 @@ cc_library(
       ":json_ast_parser",
       "//xls/common/file:filesystem",
       "//xls/common:visitor",
+      "//xls/common/logging:logging",
       "//xls/common/status:status_macros",
       "//xls/delay_model:delay_estimator",
       "//xls/delay_model:delay_estimators",

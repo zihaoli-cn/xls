@@ -6,6 +6,7 @@
 #include "absl/types/variant.h"
 
 #include "xls/common/file/filesystem.h"
+#include "xls/common/logging/logging.h"
 #include "xls/common/visitor.h"
 #include "xls/delay_model/analyze_critical_path.h"
 #include "xls/ir/function.h"
@@ -31,13 +32,16 @@ absl::StatusOr<int32_t> CheckBenchmarkSize(const std::string &benchmark_dir,
 
 TranslationBenchmark::TranslationBenchmark(const std::string &benchmark_dir,
                                            const std::string &prefix,
-                                           int32_t num_sample)
-    : benchmark_dir_(benchmark_dir), prefix_(prefix), num_sample_(num_sample),
-      current_idx_(0) {
+                                           int32_t num_sample,
+                                           bool profile_json)
+    : profile_json_(profile_json), benchmark_dir_(benchmark_dir),
+      prefix_(prefix), num_sample_(num_sample), current_idx_(0) {
+
   json_info_.reserve(num_sample);
 
   json_ast_.reserve(num_sample);
   cpp_ast_.reserve(num_sample);
+  load_json_duration_.reserve(num_sample);
   parser_duration_.reserve(num_sample);
 
   cpp_ast_size_.reserve(num_sample);
@@ -54,6 +58,8 @@ TranslationBenchmark::TranslationBenchmark(const std::string &benchmark_dir,
 
   ir_.reserve(num_sample);
 
+  pre_staff_duration_.reserve(num_sample);
+  real_staff_duration_.reserve(num_sample);
   total_duration_.reserve(num_sample);
 
   ir_nodes_.reserve(num_sample);
@@ -72,23 +78,36 @@ std::string TranslationBenchmark::GetCurrentFileName() const {
 }
 
 absl::Status TranslationBenchmark::Parse() {
+  if (profile_json_) {
   json_info_.push_back(JsonProfiler());
+  }
 
-  absl::Time start = absl::Now();
+  absl::Time load_json_start = absl::Now();
 
-  XLS_ASSIGN_OR_RETURN(std::unique_ptr<nlohmann::json> json,
+  std::unique_ptr<nlohmann::json> json;
+  if (profile_json_) {
+    XLS_ASSIGN_OR_RETURN(json,
                        LoadJson(GetCurrentFileName(), &(json_info_.back())));
+  } else {
+    XLS_ASSIGN_OR_RETURN(json, LoadJson(GetCurrentFileName(), nullptr));
+  }
+
+  absl::Duration load_json_duration = absl::Now() - load_json_start;
+  absl::Time parser_start = absl::Now();
+
   XLS_ASSIGN_OR_RETURN(std::unique_ptr<Module> ast_module,
                        ParseModuleFromJson(*json));
 
   if (current_idx_ != json_ast_.size() || current_idx_ != cpp_ast_.size() ||
+      current_idx_ != load_json_duration_.size() ||
       current_idx_ != parser_duration_.size()) {
     return absl::InternalError("Invalid size");
   }
 
   json_ast_.push_back(std::move(json));
   cpp_ast_.push_back(std::move(ast_module));
-  parser_duration_.push_back(absl::Now() - start);
+  load_json_duration_.push_back(load_json_duration);
+  parser_duration_.push_back(absl::Now() - parser_start);
 
   return absl::OkStatus();
 }
@@ -105,7 +124,10 @@ absl::Status TranslationBenchmark::Translate() {
       current_idx_ != analysis_duration_.size() ||
       current_idx_ != active_cpp_ast_size2_.size() ||
       current_idx_ != conversion_duration_.size() ||
-      current_idx_ != ir_.size() || current_idx_ != total_duration_.size()) {
+      current_idx_ != ir_.size() ||
+      current_idx_ != pre_staff_duration_.size() ||
+      current_idx_ != real_staff_duration_.size() ||
+      current_idx_ != total_duration_.size()) {
     return absl::InternalError("Invalid size");
   }
 
@@ -115,9 +137,15 @@ absl::Status TranslationBenchmark::Translate() {
   analysis_duration_.push_back(profiler.analysis_duration);
   active_cpp_ast_size2_.push_back(profiler.active_ast_num3);
   conversion_duration_.push_back(profiler.conversion_duration);
+  pre_staff_duration_.push_back(load_json_duration_.back() +
+                                parser_duration_.back());
+  real_staff_duration_.push_back(profiler.tranform_duration +
+                                 profiler.analysis_duration +
+                                 profiler.conversion_duration);
   total_duration_.push_back(
-      parser_duration_.back() + profiler.tranform_duration +
-      profiler.analysis_duration + profiler.conversion_duration);
+      load_json_duration_.back() + parser_duration_.back() +
+      profiler.tranform_duration + profiler.analysis_duration +
+      profiler.conversion_duration);
   ir_.push_back(std::move(ir_package));
 
   return absl::OkStatus();
@@ -200,42 +228,33 @@ std::string DumpTable(size_t num_sample,
 }
 } // namespace
 
-std::string TranslationBenchmark::DumpHWTransResult(bool print_vertical) {
+  XLS_LOG_IF(WARNING, profile_json_)
+      << "contains json callback's time" << std::endl;
   std::string result;
 
-  std::vector<std::string> headers = {"ID",
-                                      "Parser运行时间",
-                                      "活跃AST数量",
-                                      "Transformation运行时间",
-                                      "活跃AST数量",
-                                      "Tranformation前后AST数量之差",
-                                      "Analysis运行时间",
-                                      "Translation运行时间",
-                                      "总运行时间"};
+  std::vector<std::string> headers = {
+      "\"ID\"",        "\"Json Loader\"", "\"Parser\"",   "\"Transformation\"",
+      "\"Analysis\"",  "\"Translation\"", "\"前二模块\"", "\"后三模块\"",
+      "\"总运行时间\""};
 
   std::vector<int64_t> id_vec;
   id_vec.reserve(num_sample_);
 
-  std::vector<int64_t> transform_reduced_ast;
-  transform_reduced_ast.reserve(num_sample_);
-
   for (int i = 0; i < num_sample_; ++i) {
     id_vec.push_back(i);
-    transform_reduced_ast.push_back(cpp_ast_size_[i] -
-                                    active_cpp_ast_size1_[i]);
   }
 
   std::vector<VectorPtrType> vector_of_vector;
   vector_of_vector.reserve(headers.size());
   {
     vector_of_vector.push_back(&id_vec);
+    vector_of_vector.push_back(&load_json_duration_);
     vector_of_vector.push_back(&parser_duration_);
-    vector_of_vector.push_back(&cpp_ast_size_);
     vector_of_vector.push_back(&transform_duration_);
-    vector_of_vector.push_back(&active_cpp_ast_size1_);
-    vector_of_vector.push_back(&transform_reduced_ast);
     vector_of_vector.push_back(&analysis_duration_);
     vector_of_vector.push_back(&conversion_duration_);
+    vector_of_vector.push_back(&pre_staff_duration_);
+    vector_of_vector.push_back(&real_staff_duration_);
     vector_of_vector.push_back(&total_duration_);
   }
 
@@ -317,6 +336,9 @@ std::string TranslationBenchmark::DumpDataDepResult(bool print_vertical) {
 }
 
 std::string TranslationBenchmark::DumpJsonStatistics(bool print_vertical) {
+  if (!profile_json_) {
+    return "";
+  }
   std::string result;
 
   std::vector<std::string> headers = {"\"ID\"",    "\"Object\"", "\"Key\"",
