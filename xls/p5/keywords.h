@@ -2,6 +2,7 @@
 
 #include "absl/status/statusor.h"
 #include <string>
+#include <vector>
 namespace xls::p5 {
 #define P5_BINARY_OP(X)                                                        \
   /* logical operator */                                                       \
@@ -31,23 +32,29 @@ namespace xls::p5 {
   /* bitwise operator */                                                       \
   X("NOT", kBitwiseNot)
 
-#define P5_AST_JSON_TYNAME(X)                                                  \
-  X("LIST", kList)                                                             \
-  X("ANNOTATION", kAnnotation)                                                 \
+#define P5_EXPR_OP(X)                                                          \
   X("FUNCTION_CALL", kFunctionCall)                                            \
-  X("IDENT", kIdentifier)                                                      \
   X("CAST", kCast)                                                             \
   X("DOT", kDot)                                                               \
   X("INDEX", kArrayIndex)                                                      \
   X("INT_LIT", kIntLiteral)                                                    \
   X("SLICE", kSlice)                                                           \
+  P5_BINARY_OP(X)                                                              \
+  P5_UNARY_OP(X)
+
+#define P5_STMT_OP(X)                                                          \
   X("ASSIGN", kAssign)                                                         \
   X("BLOCK", kBlock)                                                           \
   X("IF", kIf)                                                                 \
   X("RETURN", kReturn)                                                         \
-  X("NOP", kNop)                                                               \
-  P5_BINARY_OP(X)                                                              \
-  P5_UNARY_OP(X)
+  X("NOP", kNop)
+
+#define P5_AST_JSON_TYNAME(X)                                                  \
+  X("LIST", kList)                                                             \
+  X("ANNOTATION", kAnnotation)                                                 \
+  X("IDENT", kIdentifier)                                                      \
+  P5_EXPR_OP(X)                                                                \
+  P5_STMT_OP(X)
 
 #define P5_BUILT_IN_FUNCTION(X)                                                \
   X("sizeof", kSizeOf)                                                         \
@@ -80,4 +87,7 @@ absl::StatusOr<OpKind> StrToOpKind(absl::string_view str);
 std::string OpKindToString(OpKind kind);
 
 // std::string ToString(BuiltInFuncKind kind);
+
+std::vector<std::string> GetExprTypeNames();
+std::vector<std::string> GetStmtTypeNames();
 } // namespace xls::p5

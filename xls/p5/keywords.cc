@@ -43,4 +43,18 @@ std::string OpKindToString(OpKind kind) {
   }
 }
 
+#define PUSH_BACK_STR(_str, _enum) result.push_back(_str);
+std::vector<std::string> GetExprTypeNames() {
+  std::vector<std::string> result;
+  P5_EXPR_OP(PUSH_BACK_STR)
+  return result;
+}
+
+std::vector<std::string> GetStmtTypeNames() {
+  std::vector<std::string> result;
+  P5_STMT_OP(PUSH_BACK_STR)
+  return result;
+}
+#undef PUSH_BACK_STR
+
 } // namespace xls::p5
