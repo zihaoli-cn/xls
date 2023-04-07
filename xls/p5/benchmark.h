@@ -61,7 +61,7 @@ public:
   // TODO
   //  std::string DumpJsonDepthSerise();
 
-  std::string DumpHWTransResult(bool print_vertical = true);
+  std::string DumpHWTransTime(bool print_vertical = true);
   std::string DumpDataDepResult(bool print_vertical = true);
 
   absl::Status AnalyzeDataDep();

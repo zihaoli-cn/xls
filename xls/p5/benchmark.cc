@@ -234,6 +234,7 @@ std::string DumpTable(size_t num_sample,
 }
 } // namespace
 
+std::string TranslationBenchmark::DumpHWTransTime(bool print_vertical) {
   XLS_LOG_IF(WARNING, profile_json_)
       << "contains json callback's time" << std::endl;
   std::string result;
