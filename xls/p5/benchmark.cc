@@ -213,7 +213,7 @@ std::string DumpTable(size_t num_sample,
     for (int idx = 0; idx < headers.size(); ++idx) {
       const VectorPtrType &vec = vector_of_vector[idx];
       result +=
-          absl::StrFormat("[%s,%s%s],", headers[idx], vec2line(vec), line_sep);
+          absl::StrFormat("%s,%s%s", headers[idx], vec2line(vec), line_sep);
     }
   } else {
     // Print horizontally.
