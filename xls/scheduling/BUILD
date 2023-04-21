@@ -37,13 +37,9 @@ cc_library(
         ":pipeline_schedule",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
         "//xls/common/status:status_macros",
         "//xls/ir",
-        "//xls/ir:op",
-        "//xls/ir:type",
-        "//xls/ir:value_helpers",
     ],
 )
 
@@ -62,98 +58,29 @@ cc_test(
 )
 
 cc_library(
-    name = "scheduling_options",
-    hdrs = ["scheduling_options.h"],
-    deps = [
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "//xls/delay_model:delay_estimator",
-        "//xls/ir",
-    ],
-)
-
-cc_library(
-    name = "min_cut_scheduler",
-    srcs = ["min_cut_scheduler.cc"],
-    hdrs = ["min_cut_scheduler.h"],
-    deps = [
-        ":function_partition",
-        ":schedule_bounds",
-        ":scheduling_options",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
-        "//xls/common/logging",
-        "//xls/common/logging:log_lines",
-        "//xls/common/status:ret_check",
-        "//xls/delay_model:delay_estimator",
-        "//xls/ir",
-        "//xls/ir:node_util",
-    ],
-)
-
-cc_test(
-    name = "min_cut_scheduler_test",
-    srcs = ["min_cut_scheduler_test.cc"],
-    deps = [
-        ":min_cut_scheduler",
-        "//xls/common:xls_gunit_main",
-        "@com_google_googletest//:gtest",
-    ],
-)
-
-cc_library(
-    name = "sdc_scheduler",
-    srcs = ["sdc_scheduler.cc"],
-    hdrs = ["sdc_scheduler.h"],
-    deps = [
-        ":schedule_bounds",
-        ":scheduling_options",
-        "@com_google_absl//absl/container:btree",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
-        "//xls/common/logging",
-        "//xls/common/logging:log_lines",
-        "//xls/common/status:ret_check",
-        "//xls/data_structures:strongly_connected_components",
-        "//xls/data_structures:union_find",
-        "//xls/delay_model:delay_estimator",
-        "//xls/ir",
-        "//xls/ir:node_util",
-        "@com_google_ortools//ortools/linear_solver",
-    ],
-)
-
-cc_library(
     name = "pipeline_schedule",
     srcs = ["pipeline_schedule.cc"],
     hdrs = ["pipeline_schedule.h"],
     deps = [
-        ":min_cut_scheduler",
+        ":function_partition",
         ":pipeline_schedule_cc_proto",
         ":schedule_bounds",
-        ":scheduling_options",
-        ":sdc_scheduler",
         "@com_google_absl//absl/container:btree",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
+        "@com_google_absl//absl/time:time",
         "//xls/common/logging",
         "//xls/common/logging:log_lines",
         "//xls/common/status:ret_check",
         "//xls/data_structures:binary_search",
+        "//xls/data_structures:graph_contraction",
         "//xls/delay_model:delay_estimator",
         "//xls/ir",
         "//xls/ir:node_util",
-        "//xls/ir:op",
+        "@com_google_ortools//ortools/linear_solver",
     ],
 )
 
@@ -246,72 +173,5 @@ cc_library(
         "//xls/common/logging:vlog_is_on",
         "//xls/data_structures:min_cut",
         "//xls/ir",
-    ],
-)
-
-cc_library(
-    name = "scheduling_pass_pipeline",
-    srcs = ["scheduling_pass_pipeline.cc"],
-    hdrs = ["scheduling_pass_pipeline.h"],
-    deps = [
-        ":pipeline_scheduling_pass",
-        ":scheduling_checker",
-        ":scheduling_pass",
-        ":scheduling_wrapper_pass",
-        "@com_google_absl//absl/status:statusor",
-        "//xls/passes:dce_pass",
-    ],
-)
-
-cc_library(
-    name = "scheduling_wrapper_pass",
-    srcs = ["scheduling_wrapper_pass.cc"],
-    hdrs = ["scheduling_wrapper_pass.h"],
-    deps = [
-        ":scheduling_pass",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings:str_format",
-        "//xls/common/status:status_macros",
-        "//xls/passes",
-    ],
-)
-
-cc_library(
-    name = "scheduling_checker",
-    srcs = ["scheduling_checker.cc"],
-    hdrs = ["scheduling_checker.h"],
-    deps = [
-        ":scheduling_pass",
-        "//xls/common/status:ret_check",
-        "//xls/common/status:status_macros",
-        "//xls/ir",
-        "//xls/passes",
-    ],
-)
-
-cc_library(
-    name = "scheduling_pass",
-    srcs = ["scheduling_pass.cc"],
-    hdrs = ["scheduling_pass.h"],
-    deps = [
-        ":pipeline_schedule",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
-        "//xls/delay_model:delay_estimator",
-        "//xls/ir",
-        "//xls/passes:pass_base",
-    ],
-)
-
-cc_library(
-    name = "pipeline_scheduling_pass",
-    srcs = ["pipeline_scheduling_pass.cc"],
-    hdrs = ["pipeline_scheduling_pass.h"],
-    deps = [
-        ":scheduling_pass",
-        "@com_google_absl//absl/status:statusor",
-        "//xls/common/status:ret_check",
-        "//xls/common/status:status_macros",
     ],
 )

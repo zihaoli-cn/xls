@@ -15,23 +15,19 @@
 #include "xls/scheduling/extract_stage.h"
 
 #include <algorithm>
-#include <memory>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/statusor.h"
-#include "absl/strings/match.h"
 #include "absl/strings/str_format.h"
 #include "xls/common/status/status_macros.h"
 #include "xls/ir/node.h"
 #include "xls/ir/node_iterator.h"
 #include "xls/ir/nodes.h"
-#include "xls/ir/type.h"
-#include "xls/ir/value_helpers.h"
 
 namespace xls {
 
-absl::StatusOr<Function*> ExtractStage(FunctionBase* src,
+absl::StatusOr<Function*> ExtractStage(Function* src,
                                        const PipelineSchedule& schedule,
                                        int stage) {
   // Create a new function in the package which only contains the nodes at the
@@ -55,20 +51,11 @@ absl::StatusOr<Function*> ExtractStage(FunctionBase* src,
           new_operands.push_back(new_param);
         }
       }
-      // hack to support viewing procs as functions
-      Node* new_node;
-      if (node->Is<Send>() || node->Is<Receive>()) {
-        new_node = new_f->AddNode(std::make_unique<xls::Param>(
-            node->loc(), node->GetName(), node->GetType(), new_f.get()));
-      } else {
-        XLS_ASSIGN_OR_RETURN(
-            new_node, node->CloneInNewFunction(new_operands, new_f.get()));
-      }
+      XLS_ASSIGN_OR_RETURN(Node * new_node,
+                           node->CloneInNewFunction(new_operands, new_f.get()));
       node_map[node] = new_node;
-      if (std::any_of(node->users().begin(), node->users().end(), [&](Node* u) {
-            return schedule.cycle(u) > stage || u->Is<Send>() ||
-                   new_f->HasImplicitUse(node);
-          })) {
+      if (std::any_of(node->users().begin(), node->users().end(),
+                      [&](Node* u) { return schedule.cycle(u) > stage; })) {
         live_out.push_back(new_node);
       }
     }
@@ -78,20 +65,14 @@ absl::StatusOr<Function*> ExtractStage(FunctionBase* src,
   // which gathers all nodes scheduled in the stage that are live out.
   // The tuple will be the return value of the new function.
   // Otherwise, just use the mapped function output.
-
-  auto src_function = static_cast<Function*>(src);
-  if (node_map.contains(src_function->return_value())) {
-    XLS_RETURN_IF_ERROR(
-        new_f->set_return_value(node_map[src_function->return_value()]));
+  if (node_map.contains(src->return_value())) {
+    XLS_RETURN_IF_ERROR(new_f->set_return_value(node_map[src->return_value()]));
   } else {
-    if (live_out.size() == 1) {
-      XLS_RETURN_IF_ERROR(new_f->set_return_value(live_out.front()));
-    } else {
-      XLS_ASSIGN_OR_RETURN(Node * return_tuple,
-                           new_f->MakeNode<Tuple>(SourceInfo(), live_out));
-      XLS_RETURN_IF_ERROR(new_f->set_return_value(return_tuple));
-    }
+    XLS_ASSIGN_OR_RETURN(Node * return_tuple,
+                         new_f->MakeNode<Tuple>(SourceInfo(), live_out));
+    XLS_RETURN_IF_ERROR(new_f->set_return_value(return_tuple));
   }
   return package->AddFunction(std::move(new_f));
 }
+
 }  // namespace xls

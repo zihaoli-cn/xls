@@ -34,9 +34,34 @@ namespace m = ::xls::op_matchers;
 namespace xls {
 namespace {
 
+using ::testing::ElementsAre;
 using ::testing::HasSubstr;
 using ::testing::UnorderedElementsAre;
 using xls::status_testing::StatusIs;
+
+class TestDelayEstimator : public DelayEstimator {
+ public:
+  TestDelayEstimator() : DelayEstimator("test") {}
+
+  absl::StatusOr<int64_t> GetOperationDelayInPs(Node* node) const override {
+    switch (node->op()) {
+      case Op::kAfterAll:
+      case Op::kBitSlice:
+      case Op::kConcat:
+      case Op::kLiteral:
+      case Op::kParam:
+      case Op::kReceive:
+      case Op::kSend:
+      case Op::kTupleIndex:
+        return 0;
+      case Op::kUDiv:
+      case Op::kSDiv:
+        return 2;
+      default:
+        return 1;
+    }
+  }
+};
 
 class PipelineScheduleTest : public IrTestBase {};
 
@@ -91,10 +116,11 @@ TEST_F(PipelineScheduleTest, OutrightInfeasibleSchedule) {
   XLS_ASSERT_OK_AND_ASSIGN(Function * f, fb.Build());
 
   ASSERT_THAT(
-      PipelineSchedule::Run(f, TestDelayEstimator(),
-                            SchedulingOptions(SchedulingStrategy::MIN_CUT)
-                                .clock_period_ps(1)
-                                .pipeline_stages(2))
+      PipelineSchedule::Run(
+          f, TestDelayEstimator(),
+          SchedulingOptions(SchedulingStrategy::MINIMIZE_REGISTERS)
+              .clock_period_ps(1)
+              .pipeline_stages(2))
           .status(),
       StatusIs(
           absl::StatusCode::kResourceExhausted,
@@ -113,10 +139,11 @@ TEST_F(PipelineScheduleTest, InfeasibleScheduleWithBinPacking) {
   XLS_ASSERT_OK_AND_ASSIGN(Function * f, fb.Build());
 
   ASSERT_THAT(
-      PipelineSchedule::Run(f, TestDelayEstimator(),
-                            SchedulingOptions(SchedulingStrategy::MIN_CUT)
-                                .clock_period_ps(2)
-                                .pipeline_stages(2))
+      PipelineSchedule::Run(
+          f, TestDelayEstimator(),
+          SchedulingOptions(SchedulingStrategy::MINIMIZE_REGISTERS)
+              .clock_period_ps(2)
+              .pipeline_stages(2))
           .status(),
       StatusIs(
           absl::StatusCode::kResourceExhausted,
@@ -135,10 +162,11 @@ TEST_F(PipelineScheduleTest, InfeasibleScheduleWithReturnValueUsers) {
   XLS_ASSERT_OK_AND_ASSIGN(Function * f, fb.BuildWithReturnValue(ret_value));
 
   ASSERT_THAT(
-      PipelineSchedule::Run(f, TestDelayEstimator(),
-                            SchedulingOptions(SchedulingStrategy::MIN_CUT)
-                                .clock_period_ps(1)
-                                .pipeline_stages(2))
+      PipelineSchedule::Run(
+          f, TestDelayEstimator(),
+          SchedulingOptions(SchedulingStrategy::MINIMIZE_REGISTERS)
+              .clock_period_ps(1)
+              .pipeline_stages(2))
           .status(),
       StatusIs(
           absl::StatusCode::kResourceExhausted,
@@ -502,6 +530,30 @@ TEST_F(PipelineScheduleTest, PeriodRelaxation) {
   }
 }
 
+TEST_F(PipelineScheduleTest, MinCutCycleOrders) {
+  EXPECT_THAT(GetMinCutCycleOrders(0), ElementsAre(std::vector<int64_t>()));
+  EXPECT_THAT(GetMinCutCycleOrders(1), ElementsAre(std::vector<int64_t>({0})));
+  EXPECT_THAT(
+      GetMinCutCycleOrders(2),
+      ElementsAre(std::vector<int64_t>({0, 1}), std::vector<int64_t>({1, 0})));
+  EXPECT_THAT(GetMinCutCycleOrders(3),
+              ElementsAre(std::vector<int64_t>({0, 1, 2}),
+                          std::vector<int64_t>({2, 1, 0}),
+                          std::vector<int64_t>({1, 0, 2})));
+  EXPECT_THAT(GetMinCutCycleOrders(4),
+              ElementsAre(std::vector<int64_t>({0, 1, 2, 3}),
+                          std::vector<int64_t>({3, 2, 1, 0}),
+                          std::vector<int64_t>({1, 0, 2, 3})));
+  EXPECT_THAT(GetMinCutCycleOrders(5),
+              ElementsAre(std::vector<int64_t>({0, 1, 2, 3, 4}),
+                          std::vector<int64_t>({4, 3, 2, 1, 0}),
+                          std::vector<int64_t>({2, 0, 1, 3, 4})));
+  EXPECT_THAT(GetMinCutCycleOrders(8),
+              ElementsAre(std::vector<int64_t>({0, 1, 2, 3, 4, 5, 6, 7}),
+                          std::vector<int64_t>({7, 6, 5, 4, 3, 2, 1, 0}),
+                          std::vector<int64_t>({3, 1, 0, 2, 5, 4, 6, 7})));
+}
+
 TEST_F(PipelineScheduleTest, SerializeAndDeserialize) {
   auto p = CreatePackage();
   FunctionBuilder fb(TestName(), p.get());
@@ -697,46 +749,6 @@ TEST_F(PipelineScheduleTest, ReceiveFollowedBySend) {
   EXPECT_EQ(schedule.cycle(send.node()), 2);
 }
 
-// Proc next state does not depend on param. Force schedule of a param node in a
-// later stage than the next state node. The schedule can be forced by having
-// two receive nodes where the second receive node depends on the first node,
-// and the first receive node produces the next state node and the param is used
-// by the second receive node.
-TEST_F(PipelineScheduleTest, ProcParamAndNextStateAreInSameCycle) {
-  Package p("p");
-  Type* u1 = p.GetBitsType(1);
-  XLS_ASSERT_OK_AND_ASSIGN(
-      Channel * in0,
-      p.CreateStreamingChannel("in0", ChannelOps::kReceiveOnly, u1));
-  XLS_ASSERT_OK_AND_ASSIGN(
-      Channel * in1,
-      p.CreateStreamingChannel("in1", ChannelOps::kReceiveOnly, u1));
-  ProcBuilder pb(TestName(), /*token_name=*/"tkn", &p);
-  BValue state = pb.StateElement("state", Value(UBits(1, 1)));
-  BValue nb_rcv = pb.ReceiveNonBlocking(in0, pb.GetTokenParam());
-  BValue nb_rcv_tkn = pb.TupleIndex(nb_rcv, 0);
-  BValue nb_rcv_data = pb.TupleIndex(nb_rcv, 1);
-  BValue nb_rcv_valid = pb.TupleIndex(nb_rcv, 2);
-  BValue after_all = pb.AfterAll({pb.GetTokenParam(), nb_rcv_tkn});
-  // The statement explicitly shows the use of the state node after the next
-  // state node.
-  BValue use_state = pb.And(nb_rcv_data, state);
-  BValue rcv = pb.ReceiveIf(in1, after_all, use_state);
-  BValue rcv_tkn = pb.TupleIndex(rcv, 0);
-  BValue after_all_final = pb.AfterAll({after_all, rcv_tkn});
-  XLS_ASSERT_OK_AND_ASSIGN(Proc * proc,
-                           pb.Build(after_all_final, {nb_rcv_valid}));
-
-  XLS_ASSERT_OK_AND_ASSIGN(const DelayEstimator* delay_estimator,
-                           GetDelayEstimator("unit"));
-  XLS_ASSERT_OK_AND_ASSIGN(
-      PipelineSchedule schedule,
-      PipelineSchedule::Run(proc, *delay_estimator,
-                            SchedulingOptions().pipeline_stages(3)));
-  EXPECT_EQ(schedule.length(), 3);
-  EXPECT_EQ(schedule.cycle(state.node()), schedule.cycle(nb_rcv_valid.node()));
-}
-
 TEST_F(PipelineScheduleTest, ProcScheduleWithInputDelay) {
   Package p("p");
 
@@ -813,18 +825,20 @@ TEST_F(PipelineScheduleTest, ProcScheduleWithConstraints) {
   BValue send = pb.Send(out_ch, out);
   XLS_ASSERT_OK_AND_ASSIGN(Proc * proc, pb.Build({st}));
 
-  for (int64_t i = 3; i <= 9; ++i) {
-    XLS_ASSERT_OK_AND_ASSIGN(
-        PipelineSchedule schedule,
-        PipelineSchedule::Run(
-            proc, TestDelayEstimator(),
-            SchedulingOptions().pipeline_stages(10).add_constraint(
-                IOConstraint("in", IODirection::kReceive, "out",
-                             IODirection::kSend, i, i))));
+  XLS_ASSERT_OK_AND_ASSIGN(
+      PipelineSchedule schedule,
+      PipelineSchedule::Run(
+          proc, TestDelayEstimator(),
+          SchedulingOptions()
+              .pipeline_stages(10)
+              // TODO: change this to a more meaningful test once codegen
+              // supports send/receive in cycles other than the first and last
+              .add_constraint(SchedulingConstraint("in", IODirection::kReceive,
+                                                   "out", IODirection::kSend, 9,
+                                                   9))));
 
-    EXPECT_EQ(schedule.length(), 10);
-    EXPECT_EQ(schedule.cycle(send.node()) - schedule.cycle(rcv.node()), i);
-  }
+  EXPECT_EQ(schedule.length(), 10);
+  EXPECT_EQ(schedule.cycle(send.node()) - schedule.cycle(rcv.node()), 9);
 }
 
 TEST_F(PipelineScheduleTest, RandomSchedule) {

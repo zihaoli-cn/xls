@@ -18,59 +18,288 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/time/time.h"
 #include "xls/delay_model/delay_estimator.h"
 #include "xls/ir/function.h"
 #include "xls/ir/function_base.h"
 #include "xls/ir/proc.h"
 #include "xls/scheduling/pipeline_schedule.pb.h"
-#include "xls/scheduling/scheduling_options.h"
+
+#include <vector>
 
 namespace xls {
 
+// The strategy to use when scheduling pipelines.
+enum class SchedulingStrategy {
+  // Schedule all nodes a early as possible while satisfying dependency and
+  // timing constraints.
+  ASAP,
+
+  // Minimize the number of pipeline registers when scheduling.
+  MINIMIZE_REGISTERS,
+
+  // Minimize the number of pipeline registers when scheduling using SDC-method
+  MINIMIZE_REGISTERS_SDC,
+
+  MINIMIZE_REGISTERS_INTEGER,
+
+  // Create a random but sound schedule. This is useful for testing.
+  RANDOM,
+};
+
+class SchedulerProfiler {
+public:
+  absl::Status AddInvocation(FunctionBase *f, SchedulingStrategy strategy) {
+    if (f) {
+      func_.push_back(f);
+      strategy_.push_back(strategy);
+      if (strategy != SchedulingStrategy::MINIMIZE_REGISTERS_SDC &&
+          strategy != SchedulingStrategy::MINIMIZE_REGISTERS_INTEGER) {
+        solve_mothod_duration_.push_back(absl::ZeroDuration());
+        solver_duration_.push_back(absl::ZeroDuration());
+        var_num_.push_back(0);
+        constraint_num_.push_back(0);
+      }
+      return absl::OkStatus();
+    }
+    return absl::InvalidArgumentError("f is nullptr");
+  }
+
+  absl::Status CommitResult(absl::Duration duration, int64_t quality) {
+    if (duration == absl::ZeroDuration()) {
+      return absl::InvalidArgumentError(absl::StrFormat(
+          "duration %s is absl::ZeroDuration", absl::FormatDuration(duration)));
+    }
+    if (quality <= 0) {
+      return absl::InvalidArgumentError(
+          absl::StrFormat("quality %lld is non-positive", quality));
+    }
+
+    run_duration_.push_back(duration);
+    quality_.push_back(quality);
+    return absl::OkStatus();
+  }
+
+  absl::Status CommitSolverInfo(absl::Duration solve_method,
+                                absl::Duration solver_solving, int64_t var,
+                                int64_t constraints) {
+    XLS_CHECK(strategy_.back() == SchedulingStrategy::MINIMIZE_REGISTERS_SDC &&
+              strategy_.back() ==
+                  SchedulingStrategy::MINIMIZE_REGISTERS_INTEGER);
+    if (solve_method == absl::ZeroDuration()) {
+      return absl::InvalidArgumentError(
+          absl::StrFormat("solve_method %s is absl::ZeroDuration",
+                          absl::FormatDuration(solve_method)));
+    }
+    if (solver_solving == absl::ZeroDuration()) {
+      return absl::InvalidArgumentError(
+          absl::StrFormat("solver_solving %s is absl::ZeroDuration",
+                          absl::FormatDuration(solver_solving)));
+    }
+    if (var <= 0) {
+      return absl::InvalidArgumentError(
+          absl::StrFormat("var %lld is non-positive", var));
+    }
+    if (constraints <= 0) {
+      return absl::InvalidArgumentError(
+          absl::StrFormat("constraints %lld is non-positive", constraints));
+    }
+
+    solve_mothod_duration_.push_back(solve_method);
+    solver_duration_.push_back(solver_solving);
+    var_num_.push_back(var);
+    constraint_num_.push_back(constraints);
+    return absl::OkStatus();
+  }
+
+private:
+  std::vector<FunctionBase *> func_;
+  std::vector<SchedulingStrategy> strategy_;
+  std::vector<absl::Duration> run_duration_;
+  std::vector<absl::Duration> solve_mothod_duration_;
+  std::vector<absl::Duration> solver_duration_;
+  std::vector<int64_t> var_num_;
+  std::vector<int64_t> constraint_num_;
+  std::vector<int64_t> quality_;
+};
+
+// Returns the list of ordering of cycles (pipeline stages) in which to compute
+// min cut of the graph. Each min cut of the graph computes which XLS node
+// values are in registers after a particular stage in the pipeline schedule. A
+// min-cut must be computed for each stage in the schedule to determine the set
+// of pipeline registers for the entire pipeline. The ordering of stages for
+// which the min-cut is performed (e.g., stage 0 then 1, vs stage 1 then 0) can
+// affect the total number of registers in the pipeline so multiple orderings
+// are tried. This function returns this set of orderings.  Exposed for testing.
+std::vector<std::vector<int64_t>> GetMinCutCycleOrders(int64_t length);
+
+enum class IODirection { kReceive, kSend };
+
+// This represents a constraint saying that interactions on the given
+// `source_channel` of the type specified by the given `source_direction`
+// must occur between `minimum_latency` and `maximum_latency` (inclusive) cycles
+// before interactions on the given `target_channel` of the type specified by
+// the given `target_direction`.
+class SchedulingConstraint {
+public:
+  SchedulingConstraint(absl::string_view source_channel,
+                       IODirection source_direction,
+                       absl::string_view target_channel,
+                       IODirection target_direction, int64_t minimum_latency,
+                       int64_t maximum_latency)
+      : source_channel_(source_channel), source_direction_(source_direction),
+        target_channel_(target_channel), target_direction_(target_direction),
+        minimum_latency_(minimum_latency), maximum_latency_(maximum_latency) {}
+
+  std::string SourceChannel() const { return source_channel_; }
+
+  IODirection SourceDirection() const { return source_direction_; }
+
+  std::string TargetChannel() const { return target_channel_; }
+
+  IODirection TargetDirection() const { return target_direction_; }
+
+  int64_t MinimumLatency() const { return minimum_latency_; }
+
+  int64_t MaximumLatency() const { return maximum_latency_; }
+
+private:
+  std::string source_channel_;
+  IODirection source_direction_;
+  std::string target_channel_;
+  IODirection target_direction_;
+  int64_t minimum_latency_;
+  int64_t maximum_latency_;
+};
+
+// Options to use when generating a pipeline schedule. At least a clock period
+// or a pipeline length (or both) must be specified. See
+// https://google.github.io/xls/scheduling/ for details on these options.
+class SchedulingOptions {
+public:
+  explicit SchedulingOptions(
+      SchedulingStrategy strategy = SchedulingStrategy::MINIMIZE_REGISTERS_SDC)
+      : strategy_(strategy) {}
+
+  // Returns the scheduling strategy.
+  SchedulingStrategy strategy() const { return strategy_; }
+
+  // Sets/gets the target clock period in picoseconds.
+  SchedulingOptions &clock_period_ps(int64_t value) {
+    clock_period_ps_ = value;
+    return *this;
+  }
+  std::optional<int64_t> clock_period_ps() const { return clock_period_ps_; }
+
+  // Sets/gets the target number of stages in the pipeline.
+  SchedulingOptions &pipeline_stages(int64_t value) {
+    pipeline_stages_ = value;
+    return *this;
+  }
+  std::optional<int64_t> pipeline_stages() const { return pipeline_stages_; }
+
+  // Sets/gets the percentage of clock period to set aside as a margin to ensure
+  // timing is met. Effectively, this lowers the clock period by this percentage
+  // amount for the purposes of scheduling.
+  SchedulingOptions &clock_margin_percent(int64_t value) {
+    clock_margin_percent_ = value;
+    return *this;
+  }
+  std::optional<int64_t> clock_margin_percent() const {
+    return clock_margin_percent_;
+  }
+
+  // Sets/gets the percentage of the estimated minimum period to relax so that
+  // the scheduler may have more options to find an area-efficient
+  // schedule without impacting timing.
+  SchedulingOptions &period_relaxation_percent(int64_t value) {
+    period_relaxation_percent_ = value;
+    return *this;
+  }
+  std::optional<int64_t> period_relaxation_percent() const {
+    return period_relaxation_percent_;
+  }
+
+  // Sets/gets the additional delay added to each receive node.
+  //
+  // TODO(tedhong): 2022-02-11, Update so that this sets/gets the
+  // additional delay added to each input path.
+  SchedulingOptions &additional_input_delay_ps(int64_t value) {
+    additional_input_delay_ps_ = value;
+    return *this;
+  }
+  std::optional<int64_t> additional_input_delay_ps() const {
+    return additional_input_delay_ps_;
+  }
+
+  // Add a constraint to the set of scheduling constraints.
+  SchedulingOptions &add_constraint(const SchedulingConstraint &constraint) {
+    constraints_.push_back(constraint);
+    return *this;
+  }
+  absl::Span<const SchedulingConstraint> constraints() const {
+    return constraints_;
+  }
+
+  // The random seed, which is only used if the scheduler is `RANDOM`.
+  SchedulingOptions &seed(int32_t value) {
+    seed_ = value;
+    return *this;
+  }
+  std::optional<int32_t> seed() const { return seed_; }
+
+private:
+  SchedulingStrategy strategy_;
+  std::optional<int64_t> clock_period_ps_;
+  std::optional<int64_t> pipeline_stages_;
+  std::optional<int64_t> clock_margin_percent_;
+  std::optional<int64_t> period_relaxation_percent_;
+  std::optional<int64_t> additional_input_delay_ps_;
+  std::vector<SchedulingConstraint> constraints_;
+  std::optional<int32_t> seed_;
+};
+
+// A map from node to cycle as a bare-bones representation of a schedule.
+using ScheduleCycleMap = absl::flat_hash_map<Node *, int64_t>;
+
 // Abstraction describing the binding of Nodes to cycles.
 class PipelineSchedule {
- public:
+public:
   // Produces a feed-forward pipeline schedule using the given delay model and
   // scheduling options.
-  static absl::StatusOr<PipelineSchedule> Run(
-      FunctionBase* f, const DelayEstimator& delay_estimator,
-      const SchedulingOptions& options);
+  static absl::StatusOr<PipelineSchedule>
+  Run(FunctionBase *f, const DelayEstimator &delay_estimator,
+      const SchedulingOptions &options, SchedulerProfiler *profiler);
 
   // Reconstructs a PipelineSchedule object from a proto representation.
-  static absl::StatusOr<PipelineSchedule> FromProto(
-      FunctionBase* function, const PipelineScheduleProto& proto);
+  static absl::StatusOr<PipelineSchedule>
+  FromProto(Function *function, const PipelineScheduleProto &proto);
 
   // Constructs a schedule for the given function with the given cycle map. If
   // length is not given, then the length equal to the largest cycle in cycle
   // map minus one.
-  PipelineSchedule(FunctionBase* function_base, ScheduleCycleMap cycle_map,
+  PipelineSchedule(FunctionBase *function_base, ScheduleCycleMap cycle_map,
                    std::optional<int64_t> length = absl::nullopt);
 
-  FunctionBase* function_base() const { return function_base_; }
+  FunctionBase *function_base() const { return function_base_; }
 
   // Returns whether the given node is contained in this schedule.
-  bool IsScheduled(Node* node) const { return cycle_map_.contains(node); }
-
-  // Remove a node from the schedule.
-  void RemoveNode(Node* node);
+  bool IsScheduled(Node *node) const { return cycle_map_.contains(node); }
 
   // Returns the cycle in which the node is placed. Dies if node has not
   // been placed in this schedule.
-  int64_t cycle(const Node* node) const { return cycle_map_.at(node); }
+  int64_t cycle(const Node *node) const { return cycle_map_.at(node); }
 
   // Returns the nodes scheduled in the given cycle. The node order is
   // guaranteed to be topological.
-  absl::Span<Node* const> nodes_in_cycle(int64_t cycle) const;
+  absl::Span<Node *const> nodes_in_cycle(int64_t cycle) const;
 
   std::string ToString() const;
 
   // Computes and returns the set of Nodes which are live out of the given
   // cycle. A node is live out of cycle N if it is scheduled at or before cycle
   // N and has users after cycle N.
-  std::vector<Node*> GetLiveOutOfCycle(int64_t c) const;
-
-  // Returns true if the given node is live out of the given cycle.
-  bool IsLiveOutOfCycle(Node* node, int64_t c) const;
+  std::vector<Node *> GetLiveOutOfCycle(int64_t c) const;
 
   // Returns the number of stages in the pipeline. Use 'length' instead of
   // 'size' as 'size' is ambiguous in this context (number of resources? number
@@ -86,7 +315,7 @@ class PipelineSchedule {
   // Verifies that no path of nodes scheduled in the same cycle exceeds the
   // given clock period.
   absl::Status VerifyTiming(int64_t clock_period_ps,
-                            const DelayEstimator& delay_estimator) const;
+                            const DelayEstimator &delay_estimator) const;
 
   // Returns a protobuf holding this object's scheduling info.
   PipelineScheduleProto ToProto() const;
@@ -94,16 +323,16 @@ class PipelineSchedule {
   // Returns the number of internal registers in this schedule.
   int64_t CountFinalInteriorPipelineRegisters() const;
 
- private:
-  FunctionBase* function_base_;
+private:
+  FunctionBase *function_base_;
 
   // Map from node to the cycle in which it is scheduled.
   ScheduleCycleMap cycle_map_;
 
   // The nodes scheduled each cycle.
-  std::vector<std::vector<Node*>> cycle_to_nodes_;
+  std::vector<std::vector<Node *>> cycle_to_nodes_;
 };
 
-}  // namespace xls
+} // namespace xls
 
-#endif  // XLS_SCHEDULING_PIPELINE_SCHEDULE_H_
+#endif // XLS_SCHEDULING_PIPELINE_SCHEDULE_H_
