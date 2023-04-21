@@ -167,7 +167,7 @@ public:
   }
 
   AstMutation(const MutaionOptions &options) : options_(options) {
-    // std::srand(std::time(0));
+    std::srand(std::time(0));
   }
 
   absl::Status VisitModule(Module *node) override;
