@@ -59,6 +59,7 @@ public:
   absl::Status Run();
 
   std::string DumpJsonStatistics(bool print_vertical = true);
+  std::string DumpJsonTynameCounters(bool print_vertical = true);
 
   absl::Status
   SaveJsonDepthSeries(const std::vector<size_t> &idx_vec,

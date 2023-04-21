@@ -399,6 +399,53 @@ std::string TranslationBenchmark::DumpJsonStatistics(bool print_vertical) {
                    "\n");
 }
 
+std::string TranslationBenchmark::DumpJsonTynameCounters(bool print_vertical) {
+  if (!profile_json_) {
+    return "";
+  }
+  std::string result;
+
+  std::vector<std::string> headers = {"ID", "Expression", "Statement",
+                                      "Identifier", "Other"};
+
+  std::vector<int64_t> id_vec;
+
+  std::vector<int64_t> expr_count;
+  std::vector<int64_t> stmt_count;
+  std::vector<int64_t> ident_count;
+  std::vector<int64_t> meta_count;
+
+  id_vec.reserve(num_sample_);
+
+  expr_count.reserve(num_sample_);
+  stmt_count.reserve(num_sample_);
+  ident_count.reserve(num_sample_);
+  meta_count.reserve(num_sample_);
+
+  for (int i = 0; i < num_sample_; ++i) {
+    id_vec.push_back(i);
+
+    expr_count.push_back(json_info_.at(i).expr_count);
+    stmt_count.push_back(json_info_.at(i).stmt_count);
+    ident_count.push_back(json_info_.at(i).ident_count);
+    meta_count.push_back(json_info_.at(i).meta_count);
+  }
+
+  std::vector<VectorPtrType> vector_of_vector;
+  vector_of_vector.reserve(headers.size());
+  {
+    vector_of_vector.push_back(&id_vec);
+
+    vector_of_vector.push_back(&expr_count);
+    vector_of_vector.push_back(&stmt_count);
+    vector_of_vector.push_back(&ident_count);
+    vector_of_vector.push_back(&meta_count);
+  }
+
+  return DumpTable(num_sample_, headers, vector_of_vector, print_vertical,
+                   " & ", "\\\\\n");
+}
+
 absl::Status TranslationBenchmark::SaveJsonDepthSeries(
     const std::vector<size_t> &idx_vec,
     const std::filesystem::path &output_file_prefix) {
