@@ -66,6 +66,7 @@ public:
                       const std::filesystem::path &output_file_prefix);
 
   std::string DumpHWTransTime(bool print_vertical = true);
+  std::string DumpAstNodesRealStaffTime(bool print_vertical = true);
   std::string DumpDataDepResult(bool print_vertical = true);
 
   absl::Status AnalyzeDataDep();

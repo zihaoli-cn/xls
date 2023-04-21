@@ -170,7 +170,7 @@ std::string DumpTable(size_t num_sample,
                       const std::vector<std::string> &headers,
                       const std::vector<VectorPtrType> &vector_of_vector,
                       bool print_vertical, std::string elem_sep,
-                      std::string line_sep) {
+                      std::string line_sep, bool duration_to_int64 = false) {
   std::string result;
   XLS_CHECK(vector_of_vector.size() == headers.size());
 
@@ -179,15 +179,27 @@ std::string DumpTable(size_t num_sample,
     auto vec2line = [=](const VectorPtrType &vec) -> std::string {
       return absl::visit(
           Visitor{[=](std::vector<absl::Duration> *vec_d) -> std::string {
+                    if (duration_to_int64) {
+                      return absl::StrJoin(
+                          *vec_d, elem_sep,
+                          [=](std::string *out, absl::Duration d) {
+                            absl::StrAppend(
+                                out, absl::StrFormat(
+                                         "%lld",
+                                         absl::ToInt64Microseconds(absl::Trunc(
+                                             d, absl::Microseconds(10)))));
+                          });
+                    } else {
                     return absl::StrJoin(
                         *vec_d, elem_sep,
                         [=](std::string *out, absl::Duration d) {
                           absl::StrAppend(
                               out,
-                              absl::StrFormat("\"%s\"",
-                                              absl::FormatDuration(absl::Trunc(
+                                absl::StrFormat(
+                                    "\"%s\"", absl::FormatDuration(absl::Trunc(
                                                   d, absl::Microseconds(10)))));
                         });
+                    }
                   },
                   [=](std::vector<int64_t> *vec_num) -> std::string {
                     return absl::StrJoin(
@@ -469,4 +481,35 @@ absl::Status TranslationBenchmark::SaveJsonDepthSeries(
   }
   return absl::OkStatus();
 }
-} // namespace xls::p5
+
+std::string TranslationBenchmark::DumpAstNodesRealStaffTime(
+    bool print_vertical) {
+  XLS_LOG_IF(WARNING, profile_json_)
+      << "contains json callback's time" << std::endl;
+  std::string result;
+
+  std::vector<std::string> headers = {
+      "ID",       "AstNodes",    "Transformation",
+      "Analysis", "Translation", "后三模块"};
+
+  std::vector<int64_t> id_vec;
+  id_vec.reserve(num_sample_);
+
+  for (int i = 0; i < num_sample_; ++i) {
+    id_vec.push_back(i);
+  }
+
+  std::vector<VectorPtrType> vector_of_vector;
+  vector_of_vector.reserve(headers.size());
+  {
+    vector_of_vector.push_back(&id_vec);
+    vector_of_vector.push_back(&cpp_ast_size_);
+    vector_of_vector.push_back(&transform_duration_);
+    vector_of_vector.push_back(&analysis_duration_);
+    vector_of_vector.push_back(&conversion_duration_);
+    vector_of_vector.push_back(&real_staff_duration_);
+  }
+
+  return DumpTable(num_sample_, headers, vector_of_vector, print_vertical, ",",
+                   "\n", true);
+}
