@@ -15,6 +15,9 @@
 #ifndef XLS_SCHEDULING_PIPELINE_SCHEDULE_H_
 #define XLS_SCHEDULING_PIPELINE_SCHEDULE_H_
 
+#include <string>
+#include <vector>
+
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -24,8 +27,6 @@
 #include "xls/ir/function_base.h"
 #include "xls/ir/proc.h"
 #include "xls/scheduling/pipeline_schedule.pb.h"
-
-#include <vector>
 
 namespace xls {
 
@@ -48,7 +49,7 @@ enum class SchedulingStrategy {
 };
 
 class SchedulerProfiler {
-public:
+ public:
   absl::Status AddInvocation(FunctionBase *f, SchedulingStrategy strategy) {
     if (f) {
       func_.push_back(f);
@@ -112,7 +113,9 @@ public:
     return absl::OkStatus();
   }
 
-private:
+  std::string DumpCSV();
+
+ private:
   std::vector<FunctionBase *> func_;
   std::vector<SchedulingStrategy> strategy_;
   std::vector<absl::Duration> run_duration_;
@@ -141,15 +144,18 @@ enum class IODirection { kReceive, kSend };
 // before interactions on the given `target_channel` of the type specified by
 // the given `target_direction`.
 class SchedulingConstraint {
-public:
+ public:
   SchedulingConstraint(absl::string_view source_channel,
                        IODirection source_direction,
                        absl::string_view target_channel,
                        IODirection target_direction, int64_t minimum_latency,
                        int64_t maximum_latency)
-      : source_channel_(source_channel), source_direction_(source_direction),
-        target_channel_(target_channel), target_direction_(target_direction),
-        minimum_latency_(minimum_latency), maximum_latency_(maximum_latency) {}
+      : source_channel_(source_channel),
+        source_direction_(source_direction),
+        target_channel_(target_channel),
+        target_direction_(target_direction),
+        minimum_latency_(minimum_latency),
+        maximum_latency_(maximum_latency) {}
 
   std::string SourceChannel() const { return source_channel_; }
 
@@ -163,7 +169,7 @@ public:
 
   int64_t MaximumLatency() const { return maximum_latency_; }
 
-private:
+ private:
   std::string source_channel_;
   IODirection source_direction_;
   std::string target_channel_;
@@ -176,7 +182,7 @@ private:
 // or a pipeline length (or both) must be specified. See
 // https://google.github.io/xls/scheduling/ for details on these options.
 class SchedulingOptions {
-public:
+ public:
   explicit SchedulingOptions(
       SchedulingStrategy strategy = SchedulingStrategy::MINIMIZE_REGISTERS_SDC)
       : strategy_(strategy) {}
@@ -248,7 +254,7 @@ public:
   }
   std::optional<int32_t> seed() const { return seed_; }
 
-private:
+ private:
   SchedulingStrategy strategy_;
   std::optional<int64_t> clock_period_ps_;
   std::optional<int64_t> pipeline_stages_;
@@ -264,16 +270,16 @@ using ScheduleCycleMap = absl::flat_hash_map<Node *, int64_t>;
 
 // Abstraction describing the binding of Nodes to cycles.
 class PipelineSchedule {
-public:
+ public:
   // Produces a feed-forward pipeline schedule using the given delay model and
   // scheduling options.
-  static absl::StatusOr<PipelineSchedule>
-  Run(FunctionBase *f, const DelayEstimator &delay_estimator,
+  static absl::StatusOr<PipelineSchedule> Run(
+      FunctionBase *f, const DelayEstimator &delay_estimator,
       const SchedulingOptions &options, SchedulerProfiler *profiler);
 
   // Reconstructs a PipelineSchedule object from a proto representation.
-  static absl::StatusOr<PipelineSchedule>
-  FromProto(Function *function, const PipelineScheduleProto &proto);
+  static absl::StatusOr<PipelineSchedule> FromProto(
+      Function *function, const PipelineScheduleProto &proto);
 
   // Constructs a schedule for the given function with the given cycle map. If
   // length is not given, then the length equal to the largest cycle in cycle
@@ -323,7 +329,7 @@ public:
   // Returns the number of internal registers in this schedule.
   int64_t CountFinalInteriorPipelineRegisters() const;
 
-private:
+ private:
   FunctionBase *function_base_;
 
   // Map from node to the cycle in which it is scheduled.
@@ -333,6 +339,6 @@ private:
   std::vector<std::vector<Node *>> cycle_to_nodes_;
 };
 
-} // namespace xls
+}  // namespace xls
 
-#endif // XLS_SCHEDULING_PIPELINE_SCHEDULE_H_
+#endif  // XLS_SCHEDULING_PIPELINE_SCHEDULE_H_

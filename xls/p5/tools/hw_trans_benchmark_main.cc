@@ -1,3 +1,4 @@
+#include <initializer_list>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -12,6 +13,7 @@
 #include "xls/common/logging/vlog_is_on.h"
 #include "xls/common/status/status_macros.h"
 #include "xls/p5/benchmark.h"
+#include "xls/scheduling/pipeline_schedule.h"
 
 ABSL_FLAG(std::string, benchmark_dir, "xls/p5/data/benchmark",
           "json ast benchmark's directory ");
@@ -45,7 +47,7 @@ absl::Status RealMain(const std::string &benchmark_dir,
   p5::TranslationBenchmark benchmark(benchmark_dir, prefix, size);
   XLS_RETURN_IF_ERROR(benchmark.Run());
 
-  std::vector<size_t> idx_vec = {2, 3, 4};
+  // std::vector<size_t> idx_vec = {2, 3, 4};
   // benchmark.SaveJsonDepthSeries(idx_vec, json_depth_prefix);
 
   // std::cout << benchmark.DumpJsonStatistics(print_vertical) << std::endl;
@@ -57,10 +59,30 @@ absl::Status RealMain(const std::string &benchmark_dir,
   // std::cout << benchmark.DumpAstNodesRealStaffTime(print_vertical) <<
   // std::endl;
 
-  std::cout << benchmark.DumpBitCountOutDegree(print_vertical) << std::endl;
-
   // std::cout << "\n" << benchmark.DumpDataDepResult(print_vertical) <<
   // std::endl;
+
+  SchedulerProfiler sched_profiler;
+
+  for (auto &package : benchmark.packages()) {
+    for (auto &func : package->functions()) {
+      for (SchedulingStrategy strategy :
+           {SchedulingStrategy::MINIMIZE_REGISTERS_INTEGER,
+            SchedulingStrategy::MINIMIZE_REGISTERS_SDC}) {
+        for (auto clk = 5; clk <= 10; ++clk) {
+          SchedulingOptions options(strategy);
+          options.clock_period_ps(clk);
+
+          XLS_ASSIGN_OR_RETURN(
+              PipelineSchedule result,
+              PipelineSchedule::Run(func.get(), p5::TestDelayEstimator(),
+                                    options, &sched_profiler));
+        }
+      }
+    }
+  }
+
+  std::cout << sched_profiler.DumpCSV() << std::endl;
 
   return absl::OkStatus();
 }

@@ -4,11 +4,9 @@
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
 #include "absl/types/variant.h"
-
 #include "xls/common/logging/logging.h"
 #include "xls/common/status/status_macros.h"
 #include "xls/common/visitor.h"
-
 #include "xls/delay_model/analyze_critical_path.h"
 #include "xls/ir/function.h"
 #include "xls/p5/ir_converter.h"
@@ -28,16 +26,18 @@ absl::StatusOr<int32_t> CheckBenchmarkSize(const std::string &benchmark_dir,
     status = FileExists(current);
   }
 
-    return counter - 1;
+  return counter - 1;
 }
 
 TranslationBenchmark::TranslationBenchmark(const std::string &benchmark_dir,
                                            const std::string &prefix,
                                            int32_t num_sample,
                                            bool profile_json)
-    : profile_json_(profile_json), benchmark_dir_(benchmark_dir),
-      prefix_(prefix), num_sample_(num_sample), current_idx_(0) {
-
+    : profile_json_(profile_json),
+      benchmark_dir_(benchmark_dir),
+      prefix_(prefix),
+      num_sample_(num_sample),
+      current_idx_(0) {
   json_info_.reserve(num_sample);
 
   json_ast_.reserve(num_sample);
@@ -80,7 +80,7 @@ std::string TranslationBenchmark::GetCurrentFileName() const {
 
 absl::Status TranslationBenchmark::Parse() {
   if (profile_json_) {
-  json_info_.push_back(JsonProfiler());
+    json_info_.push_back(JsonProfiler());
   }
 
   absl::Time load_json_start = absl::Now();
@@ -88,7 +88,7 @@ absl::Status TranslationBenchmark::Parse() {
   std::unique_ptr<nlohmann::json> json;
   if (profile_json_) {
     XLS_ASSIGN_OR_RETURN(json,
-                       LoadJson(GetCurrentFileName(), &(json_info_.back())));
+                         LoadJson(GetCurrentFileName(), &(json_info_.back())));
   } else {
     XLS_ASSIGN_OR_RETURN(json, LoadJson(GetCurrentFileName(), nullptr));
   }
@@ -163,8 +163,8 @@ absl::Status TranslationBenchmark::Run() {
   return absl::OkStatus();
 }
 
-  using VectorPtrType =
-      absl::variant<std::vector<absl::Duration> *, std::vector<int64_t> *>;
+using VectorPtrType =
+    absl::variant<std::vector<absl::Duration> *, std::vector<int64_t> *>;
 namespace {
 std::string DumpTable(size_t num_sample,
                       const std::vector<std::string> &headers,
@@ -190,15 +190,15 @@ std::string DumpTable(size_t num_sample,
                                              d, absl::Microseconds(10)))));
                           });
                     } else {
-                    return absl::StrJoin(
-                        *vec_d, elem_sep,
-                        [=](std::string *out, absl::Duration d) {
-                          absl::StrAppend(
-                              out,
+                      return absl::StrJoin(
+                          *vec_d, elem_sep,
+                          [=](std::string *out, absl::Duration d) {
+                            absl::StrAppend(
+                                out,
                                 absl::StrFormat(
                                     "\"%s\"", absl::FormatDuration(absl::Trunc(
                                                   d, absl::Microseconds(10)))));
-                        });
+                          });
                     }
                   },
                   [=](std::vector<int64_t> *vec_num) -> std::string {
@@ -245,7 +245,7 @@ std::string DumpTable(size_t num_sample,
 
   return result;
 }
-} // namespace
+}  // namespace
 
 std::string TranslationBenchmark::DumpHWTransTime(bool print_vertical) {
   XLS_LOG_IF(WARNING, profile_json_)
@@ -513,3 +513,4 @@ std::string TranslationBenchmark::DumpAstNodesRealStaffTime(
   return DumpTable(num_sample_, headers, vector_of_vector, print_vertical, ",",
                    "\n", true);
 }
+}  // namespace xls::p5

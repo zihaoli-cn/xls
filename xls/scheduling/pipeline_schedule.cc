@@ -82,9 +82,8 @@ absl::Status SplitAfterCycle(FunctionBase *f, int64_t cycle,
 
 // Returns the number of pipeline registers (flops) on the interior of the
 // pipeline not counting the input and output flops (if any).
-absl::StatusOr<int64_t>
-CountInteriorPipelineRegisters(FunctionBase *f,
-                               const sched::ScheduleBounds &bounds) {
+absl::StatusOr<int64_t> CountInteriorPipelineRegisters(
+    FunctionBase *f, const sched::ScheduleBounds &bounds) {
   int64_t registers = 0;
   for (Node *node : f->nodes()) {
     XLS_RET_CHECK_EQ(bounds.lb(node), bounds.ub(node)) << absl::StrFormat(
@@ -103,10 +102,9 @@ CountInteriorPipelineRegisters(FunctionBase *f,
 // period. Attempts to split nodes into stages such that the total number of
 // flops in the pipeline stages is minimized without violating the target clock
 // period.
-absl::StatusOr<ScheduleCycleMap>
-ScheduleToMinimizeRegisters(FunctionBase *f, int64_t pipeline_stages,
-                            const DelayEstimator &delay_estimator,
-                            sched::ScheduleBounds *bounds) {
+absl::StatusOr<ScheduleCycleMap> ScheduleToMinimizeRegisters(
+    FunctionBase *f, int64_t pipeline_stages,
+    const DelayEstimator &delay_estimator, sched::ScheduleBounds *bounds) {
   XLS_VLOG(3) << "ScheduleToMinimizeRegisters()";
   XLS_VLOG(3) << "  pipeline stages = " << pipeline_stages;
   XLS_VLOG_LINES(4, f->DumpIr());
@@ -157,8 +155,8 @@ using DelayMap = absl::flat_hash_map<Node *, int64_t>;
 // The result is used by `ComputeCriticalCombPathsUntilNextCycle`,
 // `ComputeSingleSourceCCPUntilNextCycle`,
 // `ScheduleToMinimizeRegistersSDC`
-absl::StatusOr<DelayMap>
-ComputeNodeDelays(FunctionBase *f, const DelayEstimator &delay_estimator) {
+absl::StatusOr<DelayMap> ComputeNodeDelays(
+    FunctionBase *f, const DelayEstimator &delay_estimator) {
   DelayMap result;
   for (Node *node : f->nodes()) {
     XLS_ASSIGN_OR_RETURN(result[node],
@@ -554,11 +552,10 @@ std::vector<Node *> FinalStageNodes(FunctionBase *f) {
 // set on the bounds object with the maximum upper bound set to
 // `schedule_length` - 1. Otherwise, the maximum upper bound is set to the
 // maximum lower bound.
-absl::StatusOr<sched::ScheduleBounds>
-ConstructBounds(FunctionBase *f, int64_t clock_period_ps,
-                std::vector<Node *> topo_sort,
-                std::optional<int64_t> schedule_length,
-                const DelayEstimator &delay_estimator) {
+absl::StatusOr<sched::ScheduleBounds> ConstructBounds(
+    FunctionBase *f, int64_t clock_period_ps, std::vector<Node *> topo_sort,
+    std::optional<int64_t> schedule_length,
+    const DelayEstimator &delay_estimator) {
   sched::ScheduleBounds bounds(f, std::move(topo_sort), clock_period_ps,
                                delay_estimator);
 
@@ -622,9 +619,8 @@ ConstructBounds(FunctionBase *f, int64_t clock_period_ps,
 }
 
 // Returns the critical path through the given nodes (ordered topologically).
-absl::StatusOr<int64_t>
-ComputeCriticalPath(absl::Span<Node *const> topo_sort,
-                    const DelayEstimator &delay_estimator) {
+absl::StatusOr<int64_t> ComputeCriticalPath(
+    absl::Span<Node *const> topo_sort, const DelayEstimator &delay_estimator) {
   int64_t function_cp = 0;
   absl::flat_hash_map<Node *, int64_t> node_cp;
   for (Node *node : topo_sort) {
@@ -642,9 +638,9 @@ ComputeCriticalPath(absl::Span<Node *const> topo_sort,
 
 // Returns the minimum clock period in picoseconds for which it is feasible to
 // schedule the function into a pipeline with the given number of stages.
-absl::StatusOr<int64_t>
-FindMinimumClockPeriod(FunctionBase *f, int64_t pipeline_stages,
-                       const DelayEstimator &delay_estimator) {
+absl::StatusOr<int64_t> FindMinimumClockPeriod(
+    FunctionBase *f, int64_t pipeline_stages,
+    const DelayEstimator &delay_estimator) {
   XLS_VLOG(4) << "FindMinimumClockPeriod()";
   XLS_VLOG(4) << "  pipeline stages = " << pipeline_stages;
   auto topo_sort_it = TopoSort(f);
@@ -701,7 +697,7 @@ std::vector<int64_t> MiddleFirstOrder(int64_t first, int64_t last) {
   return ret;
 }
 
-} // namespace
+}  // namespace
 
 std::vector<std::vector<int64_t>> GetMinCutCycleOrders(int64_t length) {
   if (length == 0) {
@@ -763,9 +759,8 @@ PipelineSchedule::PipelineSchedule(FunctionBase *function_base,
   }
 }
 
-absl::StatusOr<PipelineSchedule>
-PipelineSchedule::FromProto(Function *function,
-                            const PipelineScheduleProto &proto) {
+absl::StatusOr<PipelineSchedule> PipelineSchedule::FromProto(
+    Function *function, const PipelineScheduleProto &proto) {
   ScheduleCycleMap cycle_map;
   for (const auto &stage : proto.stages()) {
     for (const auto &node_name : stage.nodes()) {
@@ -799,13 +794,14 @@ std::vector<Node *> PipelineSchedule::GetLiveOutOfCycle(int64_t c) const {
 
 namespace {
 class DelayEstimatorWithInputDelay : public DelayEstimator {
-public:
+ public:
   DelayEstimatorWithInputDelay(const DelayEstimator &base, int64_t input_delay)
       : DelayEstimator(absl::StrFormat("%s_with_input_delay", base.name())),
-        base_delay_estimator_(&base), input_delay_(input_delay) {}
+        base_delay_estimator_(&base),
+        input_delay_(input_delay) {}
 
-  virtual absl::StatusOr<int64_t>
-  GetOperationDelayInPs(Node *node) const override {
+  virtual absl::StatusOr<int64_t> GetOperationDelayInPs(
+      Node *node) const override {
     XLS_ASSIGN_OR_RETURN(int64_t base_delay,
                          base_delay_estimator_->GetOperationDelayInPs(node));
 
@@ -813,16 +809,15 @@ public:
                                         : base_delay;
   }
 
-private:
+ private:
   const DelayEstimator *base_delay_estimator_;
   int64_t input_delay_;
 };
-} // namespace
+}  // namespace
 
-/*static*/ absl::StatusOr<PipelineSchedule>
-PipelineSchedule::Run(FunctionBase *f, const DelayEstimator &delay_estimator,
-                      const SchedulingOptions &options,
-                      SchedulerProfiler *profiler) {
+/*static*/ absl::StatusOr<PipelineSchedule> PipelineSchedule::Run(
+    FunctionBase *f, const DelayEstimator &delay_estimator,
+    const SchedulingOptions &options, SchedulerProfiler *profiler) {
   // For profiler: start
   absl::Time run_start = absl::Now();
   if (profiler) {
@@ -888,18 +883,18 @@ PipelineSchedule::Run(FunctionBase *f, const DelayEstimator &delay_estimator,
                                         f, schedule_length,
                                         delay_estimator_with_delay, &bounds));
   } else if (options.strategy() == SchedulingStrategy::MINIMIZE_REGISTERS_SDC) {
-    XLS_ASSIGN_OR_RETURN(cycle_map,
-                         ScheduleToMinimizeRegistersSDC(
-                             f, schedule_length, delay_estimator_with_delay,
-                             &bounds, clock_period_ps, options.constraints(),
-                             "GLOP", profiler));
+    XLS_ASSIGN_OR_RETURN(
+        cycle_map,
+        ScheduleToMinimizeRegistersSDC(
+            f, schedule_length, delay_estimator_with_delay, &bounds,
+            clock_period_ps, options.constraints(), "GLOP", profiler));
   } else if (options.strategy() ==
              SchedulingStrategy::MINIMIZE_REGISTERS_INTEGER) {
-    XLS_ASSIGN_OR_RETURN(cycle_map,
-                         ScheduleToMinimizeRegistersSDC(
-                             f, schedule_length, delay_estimator_with_delay,
-                             &bounds, clock_period_ps, options.constraints(),
-                             "SCIP", profiler));
+    XLS_ASSIGN_OR_RETURN(
+        cycle_map,
+        ScheduleToMinimizeRegistersSDC(
+            f, schedule_length, delay_estimator_with_delay, &bounds,
+            clock_period_ps, options.constraints(), "SCIP", profiler));
   } else if (options.strategy() == SchedulingStrategy::RANDOM) {
     for (Node *node : TopoSort(f)) {
       int64_t lower_bound = bounds.lb(node);
@@ -1012,9 +1007,8 @@ absl::Status PipelineSchedule::Verify() const {
   return absl::OkStatus();
 }
 
-absl::Status
-PipelineSchedule::VerifyTiming(int64_t clock_period_ps,
-                               const DelayEstimator &delay_estimator) const {
+absl::Status PipelineSchedule::VerifyTiming(
+    int64_t clock_period_ps, const DelayEstimator &delay_estimator) const {
   // Critical path from start of the cycle that a node is scheduled through the
   // node itself. If the schedule meets timing, then this value should be less
   // than or equal to clock_period_ps for every node.
@@ -1114,4 +1108,33 @@ int64_t PipelineSchedule::CountFinalInteriorPipelineRegisters() const {
   return reg_count;
 }
 
-} // namespace xls
+std::string SchedulerProfiler::DumpCSV() {
+  std::string result =
+      "Function,Strategy,Run Duration,Solve Method Duration,Solver "
+      "Duration,Var Num,Constraint Num,Quality\n";
+  auto enum_to_str = [](SchedulingStrategy s) -> std::string {
+    switch (s) {
+      case SchedulingStrategy::ASAP:
+        return "ASAP";
+      case SchedulingStrategy::MINIMIZE_REGISTERS:
+        return "MinCut";
+      case SchedulingStrategy::MINIMIZE_REGISTERS_SDC:
+        return "SDC";
+      case SchedulingStrategy::MINIMIZE_REGISTERS_INTEGER:
+        return "IntegerProg";
+    }
+  };
+
+  for (auto i = 0; i < func_.size(); ++i) {
+    result += absl::StrFormat(
+        "%p,%s,%s,%s,%s,%lld,%lld,%lld\n", func_.at(i),
+        enum_to_str(strategy_.at(i)), absl::FormatDuration(run_duration_.at(i)),
+        absl::FormatDuration(solve_mothod_duration_.at(i)),
+        absl::FormatDuration(solver_duration_.at(i)), var_num_.at(i),
+        constraint_num_.at(i), quality_.at(i));
+  }
+
+  return result;
+}
+
+}  // namespace xls
