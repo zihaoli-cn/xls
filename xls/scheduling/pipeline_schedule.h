@@ -224,7 +224,7 @@ class SchedulerProfiler {
   absl::Status CommitSolverInfo(absl::Duration solve_method,
                                 absl::Duration solver_solving, int64_t var,
                                 int64_t constraints) {
-    XLS_CHECK(strategy_.back() == SchedulingStrategy::MINIMIZE_REGISTERS_SDC &&
+    XLS_CHECK(strategy_.back() == SchedulingStrategy::MINIMIZE_REGISTERS_SDC ||
               strategy_.back() ==
                   SchedulingStrategy::MINIMIZE_REGISTERS_INTEGER);
     if (solve_method == absl::ZeroDuration()) {
