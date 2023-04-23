@@ -310,10 +310,9 @@ absl::StatusOr<ScheduleCycleMap> ScheduleToMinimizeRegistersSDC(
   // Node's lifetime, from when it finishes executing until it is consumed by
   // the last user.
   absl::flat_hash_map<Node *, or_tools::MPVariable *> lifetime_var;
-
   for (Node *node : f->nodes()) {
-    cycle_var[node] = solver->MakeNumVar(bounds->lb(node), bounds->ub(node),
-                                          node->GetName());
+    cycle_var[node] =
+        solver->MakeNumVar(bounds->lb(node), bounds->ub(node), node->GetName());
     lifetime_var[node] = solver->MakeNumVar(
         0.0, infinity, absl::StrFormat("lifetime_%s", node->GetName()));
   }
@@ -380,8 +379,8 @@ absl::StatusOr<ScheduleCycleMap> ScheduleToMinimizeRegistersSDC(
 
   // A dummy node to represent an artificial sink node on the data-dependence
   // graph.
-  or_tools::MPVariable *cycle_at_sinknode;
-  solver->MakeNumVar(-infinity, infinity, "cycle_at_sinknode");
+  or_tools::MPVariable *cycle_at_sinknode =
+      solver->MakeNumVar(-infinity, infinity, "cycle_at_sinknode");
 
   for (Node *node : f->nodes()) {
     or_tools::MPVariable *lifetime_at_node = lifetime_var[node];
@@ -871,10 +870,9 @@ class DelayEstimatorWithInputDelay : public DelayEstimator {
                                         delay_estimator_with_delay, &bounds));
   } else if (options.strategy() == SchedulingStrategy::MINIMIZE_REGISTERS_SDC) {
     XLS_ASSIGN_OR_RETURN(
-        cycle_map,
-        ScheduleToMinimizeRegistersSDC(
-            f, schedule_length, delay_estimator_with_delay, &bounds,
-            clock_period_ps, options.constraints(), profiler));
+        cycle_map, ScheduleToMinimizeRegistersSDC(
+                       f, schedule_length, delay_estimator_with_delay, &bounds,
+                       clock_period_ps, options.constraints(), profiler));
   } else if (options.strategy() == SchedulingStrategy::RANDOM) {
     for (Node *node : TopoSort(f)) {
       int64_t lower_bound = bounds.lb(node);
