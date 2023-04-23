@@ -15,6 +15,7 @@
 #ifndef XLS_SCHEDULING_PIPELINE_SCHEDULE_H_
 #define XLS_SCHEDULING_PIPELINE_SCHEDULE_H_
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -189,8 +190,14 @@ class SchedulingOptions {
 
 class SchedulerProfiler {
  public:
+  SchedulerProfiler() { next_id_ = 0; }
+
   absl::Status AddInvocation(FunctionBase *f, const SchedulingOptions &opt) {
     if (f) {
+      if (!func2id_.contains(f)) {
+        func2id_[f] = next_id_++;
+      }
+
       func_.push_back(f);
       strategy_.push_back(opt.strategy());
       clk_.push_back(*opt.clock_period_ps());
@@ -256,6 +263,9 @@ class SchedulerProfiler {
   std::string DumpCSV();
 
  private:
+  std::map<FunctionBase *, int64_t> func2id_;
+  int64_t next_id_ = 0;
+
   std::vector<FunctionBase *> func_;
   std::vector<SchedulingStrategy> strategy_;
   std::vector<int64_t> clk_;

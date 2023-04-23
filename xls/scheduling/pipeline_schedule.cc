@@ -313,12 +313,12 @@ absl::StatusOr<ScheduleCycleMap> ScheduleToMinimizeRegistersSDC(
   // the last user.
   absl::flat_hash_map<Node *, or_tools::MPVariable *> lifetime_var;
   if (solver_name == "GLOP") {
-  for (Node *node : f->nodes()) {
+    for (Node *node : f->nodes()) {
       cycle_var[node] = solver->MakeNumVar(bounds->lb(node), bounds->ub(node),
                                            node->GetName());
-    lifetime_var[node] = solver->MakeNumVar(
-        0.0, infinity, absl::StrFormat("lifetime_%s", node->GetName()));
-  }
+      lifetime_var[node] = solver->MakeNumVar(
+          0.0, infinity, absl::StrFormat("lifetime_%s", node->GetName()));
+    }
   } else {
     for (Node *node : f->nodes()) {
       cycle_var[node] = solver->MakeIntVar(bounds->lb(node), bounds->ub(node),
@@ -887,7 +887,7 @@ class DelayEstimatorWithInputDelay : public DelayEstimator {
     XLS_ASSIGN_OR_RETURN(
         cycle_map,
         ScheduleToMinimizeRegistersSDC(
-                       f, schedule_length, delay_estimator_with_delay, &bounds,
+            f, schedule_length, delay_estimator_with_delay, &bounds,
             clock_period_ps, options.constraints(), "GLOP", profiler));
   } else if (options.strategy() ==
              SchedulingStrategy::MINIMIZE_REGISTERS_INTEGER) {
@@ -1111,7 +1111,7 @@ int64_t PipelineSchedule::CountFinalInteriorPipelineRegisters() const {
 
 std::string SchedulerProfiler::DumpCSV() {
   std::string result =
-      "Function,Strategy,Run Duration,Solve Method Duration,Solver "
+      "ID,CLK,Strategy,Run Duration,Solve Method Duration,Solver "
       "Duration,Var Num,Constraint Num,Quality\n";
   auto enum_to_str = [](SchedulingStrategy s) -> std::string {
     switch (s) {
@@ -1122,14 +1122,15 @@ std::string SchedulerProfiler::DumpCSV() {
       case SchedulingStrategy::MINIMIZE_REGISTERS_SDC:
         return "SDC";
       case SchedulingStrategy::MINIMIZE_REGISTERS_INTEGER:
-        return "IntegerProg";
+        return "Int";
     }
   };
 
   for (auto i = 0; i < func_.size(); ++i) {
     result += absl::StrFormat(
-        "%p,%s,%s,%s,%s,%lld,%lld,%lld\n", func_.at(i),
-        enum_to_str(strategy_.at(i)), absl::FormatDuration(run_duration_.at(i)),
+        "%lld,%lld,%s,%s,%s,%s,%lld,%lld,%lld\n", func2id_.at(func_.at(i)),
+        clk_.at(i), enum_to_str(strategy_.at(i)),
+        absl::FormatDuration(run_duration_.at(i)),
         absl::FormatDuration(solve_mothod_duration_.at(i)),
         absl::FormatDuration(solver_duration_.at(i)), var_num_.at(i),
         constraint_num_.at(i), quality_.at(i));
