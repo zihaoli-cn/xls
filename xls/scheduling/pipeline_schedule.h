@@ -194,7 +194,7 @@ class SchedulerProfiler {
 
   absl::Status AddInvocation(FunctionBase *f, const SchedulingOptions &opt) {
     if (f) {
-      if (!func2id_.contains(f)) {
+      if (func2id_.find(f) == func2id_.end()) {
         func2id_[f] = next_id_++;
       }
 
