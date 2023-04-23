@@ -69,7 +69,7 @@ absl::Status RealMain(const std::string &benchmark_dir,
     for (auto &func : package->functions()) {
       std::cerr << "new func " << std::endl;
       for (SchedulingStrategy strategy :
-           {SchedulingStrategy::ASAP, SchedulingStrategy::RANDOM,
+           {SchedulingStrategy::ASAP,
             SchedulingStrategy::MINIMIZE_REGISTERS_INTEGER,
             SchedulingStrategy::MINIMIZE_REGISTERS_SDC,
             SchedulingStrategy::MINIMIZE_REGISTERS}) {
