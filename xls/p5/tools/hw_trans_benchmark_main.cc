@@ -1,3 +1,4 @@
+#include <fstream>
 #include <initializer_list>
 #include <iostream>
 #include <string>
@@ -68,9 +69,11 @@ absl::Status RealMain(const std::string &benchmark_dir,
     for (auto &func : package->functions()) {
       std::cerr << "new func " << std::endl;
       for (SchedulingStrategy strategy :
-           {SchedulingStrategy::MINIMIZE_REGISTERS_SDC,
+           {SchedulingStrategy::ASAP, SchedulingStrategy::RANDOM,
+            SchedulingStrategy::MINIMIZE_REGISTERS_INTEGER,
+            SchedulingStrategy::MINIMIZE_REGISTERS_SDC,
             SchedulingStrategy::MINIMIZE_REGISTERS}) {
-        for (auto clk = 5; clk <= 10; ++clk) {
+        for (auto clk = 5; clk <= 10; clk++) {
           SchedulingOptions options(strategy);
           options.clock_period_ps(clk);
 
@@ -85,7 +88,10 @@ absl::Status RealMain(const std::string &benchmark_dir,
     }
   }
 
-  std::cout << sched_profiler.DumpCSV() << std::endl;
+  std::ofstream fout;
+  fout.open("xls/p5/data/scheduling/result.csv", std::ios::out);
+  fout << sched_profiler.DumpCSV() << std::endl;
+  fout.close();
 
   return absl::OkStatus();
 }
