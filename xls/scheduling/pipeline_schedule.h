@@ -48,84 +48,6 @@ enum class SchedulingStrategy {
   RANDOM,
 };
 
-class SchedulerProfiler {
- public:
-  absl::Status AddInvocation(FunctionBase *f, SchedulingStrategy strategy) {
-    if (f) {
-      func_.push_back(f);
-      strategy_.push_back(strategy);
-      if (strategy != SchedulingStrategy::MINIMIZE_REGISTERS_SDC &&
-          strategy != SchedulingStrategy::MINIMIZE_REGISTERS_INTEGER) {
-        solve_mothod_duration_.push_back(absl::ZeroDuration());
-        solver_duration_.push_back(absl::ZeroDuration());
-        var_num_.push_back(0);
-        constraint_num_.push_back(0);
-      }
-      return absl::OkStatus();
-    }
-    return absl::InvalidArgumentError("f is nullptr");
-  }
-
-  absl::Status CommitResult(absl::Duration duration, int64_t quality) {
-    if (duration == absl::ZeroDuration()) {
-      return absl::InvalidArgumentError(absl::StrFormat(
-          "duration %s is absl::ZeroDuration", absl::FormatDuration(duration)));
-    }
-    if (quality <= 0) {
-      return absl::InvalidArgumentError(
-          absl::StrFormat("quality %lld is non-positive", quality));
-    }
-
-    run_duration_.push_back(duration);
-    quality_.push_back(quality);
-    return absl::OkStatus();
-  }
-
-  absl::Status CommitSolverInfo(absl::Duration solve_method,
-                                absl::Duration solver_solving, int64_t var,
-                                int64_t constraints) {
-    XLS_CHECK(strategy_.back() == SchedulingStrategy::MINIMIZE_REGISTERS_SDC &&
-              strategy_.back() ==
-                  SchedulingStrategy::MINIMIZE_REGISTERS_INTEGER);
-    if (solve_method == absl::ZeroDuration()) {
-      return absl::InvalidArgumentError(
-          absl::StrFormat("solve_method %s is absl::ZeroDuration",
-                          absl::FormatDuration(solve_method)));
-    }
-    if (solver_solving == absl::ZeroDuration()) {
-      return absl::InvalidArgumentError(
-          absl::StrFormat("solver_solving %s is absl::ZeroDuration",
-                          absl::FormatDuration(solver_solving)));
-    }
-    if (var <= 0) {
-      return absl::InvalidArgumentError(
-          absl::StrFormat("var %lld is non-positive", var));
-    }
-    if (constraints <= 0) {
-      return absl::InvalidArgumentError(
-          absl::StrFormat("constraints %lld is non-positive", constraints));
-    }
-
-    solve_mothod_duration_.push_back(solve_method);
-    solver_duration_.push_back(solver_solving);
-    var_num_.push_back(var);
-    constraint_num_.push_back(constraints);
-    return absl::OkStatus();
-  }
-
-  std::string DumpCSV();
-
- private:
-  std::vector<FunctionBase *> func_;
-  std::vector<SchedulingStrategy> strategy_;
-  std::vector<absl::Duration> run_duration_;
-  std::vector<absl::Duration> solve_mothod_duration_;
-  std::vector<absl::Duration> solver_duration_;
-  std::vector<int64_t> var_num_;
-  std::vector<int64_t> constraint_num_;
-  std::vector<int64_t> quality_;
-};
-
 // Returns the list of ordering of cycles (pipeline stages) in which to compute
 // min cut of the graph. Each min cut of the graph computes which XLS node
 // values are in registers after a particular stage in the pipeline schedule. A
@@ -263,6 +185,86 @@ class SchedulingOptions {
   std::optional<int64_t> additional_input_delay_ps_;
   std::vector<SchedulingConstraint> constraints_;
   std::optional<int32_t> seed_;
+};
+
+class SchedulerProfiler {
+ public:
+  absl::Status AddInvocation(FunctionBase *f, const SchedulingOptions &opt) {
+    if (f) {
+      func_.push_back(f);
+      strategy_.push_back(opt.strategy());
+      clk_.push_back(*opt.clock_period_ps());
+      if (opt.strategy() != SchedulingStrategy::MINIMIZE_REGISTERS_SDC &&
+          opt.strategy() != SchedulingStrategy::MINIMIZE_REGISTERS_INTEGER) {
+        solve_mothod_duration_.push_back(absl::ZeroDuration());
+        solver_duration_.push_back(absl::ZeroDuration());
+        var_num_.push_back(0);
+        constraint_num_.push_back(0);
+      }
+      return absl::OkStatus();
+    }
+    return absl::InvalidArgumentError("f is nullptr");
+  }
+
+  absl::Status CommitResult(absl::Duration duration, int64_t quality) {
+    if (duration == absl::ZeroDuration()) {
+      return absl::InvalidArgumentError(absl::StrFormat(
+          "duration %s is absl::ZeroDuration", absl::FormatDuration(duration)));
+    }
+    if (quality <= 0) {
+      return absl::InvalidArgumentError(
+          absl::StrFormat("quality %lld is non-positive", quality));
+    }
+
+    run_duration_.push_back(duration);
+    quality_.push_back(quality);
+    return absl::OkStatus();
+  }
+
+  absl::Status CommitSolverInfo(absl::Duration solve_method,
+                                absl::Duration solver_solving, int64_t var,
+                                int64_t constraints) {
+    XLS_CHECK(strategy_.back() == SchedulingStrategy::MINIMIZE_REGISTERS_SDC &&
+              strategy_.back() ==
+                  SchedulingStrategy::MINIMIZE_REGISTERS_INTEGER);
+    if (solve_method == absl::ZeroDuration()) {
+      return absl::InvalidArgumentError(
+          absl::StrFormat("solve_method %s is absl::ZeroDuration",
+                          absl::FormatDuration(solve_method)));
+    }
+    if (solver_solving == absl::ZeroDuration()) {
+      return absl::InvalidArgumentError(
+          absl::StrFormat("solver_solving %s is absl::ZeroDuration",
+                          absl::FormatDuration(solver_solving)));
+    }
+    if (var <= 0) {
+      return absl::InvalidArgumentError(
+          absl::StrFormat("var %lld is non-positive", var));
+    }
+    if (constraints <= 0) {
+      return absl::InvalidArgumentError(
+          absl::StrFormat("constraints %lld is non-positive", constraints));
+    }
+
+    solve_mothod_duration_.push_back(solve_method);
+    solver_duration_.push_back(solver_solving);
+    var_num_.push_back(var);
+    constraint_num_.push_back(constraints);
+    return absl::OkStatus();
+  }
+
+  std::string DumpCSV();
+
+ private:
+  std::vector<FunctionBase *> func_;
+  std::vector<SchedulingStrategy> strategy_;
+  std::vector<int64_t> clk_;
+  std::vector<absl::Duration> run_duration_;
+  std::vector<absl::Duration> solve_mothod_duration_;
+  std::vector<absl::Duration> solver_duration_;
+  std::vector<int64_t> var_num_;
+  std::vector<int64_t> constraint_num_;
+  std::vector<int64_t> quality_;
 };
 
 // A map from node to cycle as a bare-bones representation of a schedule.

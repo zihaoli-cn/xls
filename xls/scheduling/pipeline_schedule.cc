@@ -282,7 +282,7 @@ absl::StatusOr<ScheduleCycleMap> ScheduleToMinimizeRegistersSDC(
     FunctionBase *f, int64_t pipeline_stages,
     const DelayEstimator &delay_estimator, sched::ScheduleBounds *bounds,
     int64_t clock_period_ps, absl::Span<const SchedulingConstraint> constraints,
-    std::string solver_name, SchedulerProfiler *profiler) {
+    SchedulerProfiler *profiler) {
   // For profiler: start
   absl::Time solver_method_start = absl::Now();
   // For profiler: end
@@ -297,10 +297,9 @@ absl::StatusOr<ScheduleCycleMap> ScheduleToMinimizeRegistersSDC(
   namespace or_tools = ::operations_research;
 
   std::unique_ptr<or_tools::MPSolver> solver(
-      or_tools::MPSolver::CreateSolver(solver_name));
+      or_tools::MPSolver::CreateSolver("GLOP"));
   if (!solver) {
-    return absl::UnavailableError(
-        absl::StrFormat("%s solver unavailable.", solver_name));
+    return absl::UnavailableError("GLOP solver unavailable.");
   }
 
   const double infinity = solver->infinity();
@@ -311,20 +310,12 @@ absl::StatusOr<ScheduleCycleMap> ScheduleToMinimizeRegistersSDC(
   // Node's lifetime, from when it finishes executing until it is consumed by
   // the last user.
   absl::flat_hash_map<Node *, or_tools::MPVariable *> lifetime_var;
-  if (solver_name == "GLOP") {
-    for (Node *node : f->nodes()) {
-      cycle_var[node] = solver->MakeNumVar(bounds->lb(node), bounds->ub(node),
-                                           node->GetName());
-      lifetime_var[node] = solver->MakeNumVar(
-          0.0, infinity, absl::StrFormat("lifetime_%s", node->GetName()));
-    }
-  } else if (solver_name == "SCIP") {
-    for (Node *node : f->nodes()) {
-      cycle_var[node] = solver->MakeIntVar(bounds->lb(node), bounds->ub(node),
-                                           node->GetName());
-      lifetime_var[node] = solver->MakeIntVar(
-          0.0, infinity, absl::StrFormat("lifetime_%s", node->GetName()));
-    }
+
+  for (Node *node : f->nodes()) {
+    cycle_var[node] = solver->MakeNumVar(bounds->lb(node), bounds->ub(node),
+                                          node->GetName());
+    lifetime_var[node] = solver->MakeNumVar(
+        0.0, infinity, absl::StrFormat("lifetime_%s", node->GetName()));
   }
 
   // Map from channel name to set of nodes that send/receive on that channel.
@@ -390,11 +381,7 @@ absl::StatusOr<ScheduleCycleMap> ScheduleToMinimizeRegistersSDC(
   // A dummy node to represent an artificial sink node on the data-dependence
   // graph.
   or_tools::MPVariable *cycle_at_sinknode;
-  if (solver_name == "GLOP") {
-    solver->MakeNumVar(-infinity, infinity, "cycle_at_sinknode");
-  } else if (solver_name == "SCIP") {
-    solver->MakeIntVar(-infinity, infinity, "cycle_at_sinknode");
-  }
+  solver->MakeNumVar(-infinity, infinity, "cycle_at_sinknode");
 
   for (Node *node : f->nodes()) {
     or_tools::MPVariable *lifetime_at_node = lifetime_var[node];
@@ -821,7 +808,7 @@ class DelayEstimatorWithInputDelay : public DelayEstimator {
   // For profiler: start
   absl::Time run_start = absl::Now();
   if (profiler) {
-    XLS_CHECK_OK(profiler->AddInvocation(f, options.strategy()));
+    XLS_CHECK_OK(profiler->AddInvocation(f, options));
   }
   auto profiler_commit = [&](const PipelineSchedule &sched) {
     if (profiler) {
@@ -887,14 +874,7 @@ class DelayEstimatorWithInputDelay : public DelayEstimator {
         cycle_map,
         ScheduleToMinimizeRegistersSDC(
             f, schedule_length, delay_estimator_with_delay, &bounds,
-            clock_period_ps, options.constraints(), "GLOP", profiler));
-  } else if (options.strategy() ==
-             SchedulingStrategy::MINIMIZE_REGISTERS_INTEGER) {
-    XLS_ASSIGN_OR_RETURN(
-        cycle_map,
-        ScheduleToMinimizeRegistersSDC(
-            f, schedule_length, delay_estimator_with_delay, &bounds,
-            clock_period_ps, options.constraints(), "SCIP", profiler));
+            clock_period_ps, options.constraints(), profiler));
   } else if (options.strategy() == SchedulingStrategy::RANDOM) {
     for (Node *node : TopoSort(f)) {
       int64_t lower_bound = bounds.lb(node);

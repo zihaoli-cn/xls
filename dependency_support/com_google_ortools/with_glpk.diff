@@ -1,0 +1,97 @@
+diff --git ortools/linear_solver/BUILD.bazel ortools/linear_solver/BUILD.bazel
+index 9c9a1d0a6c..3ed4d1cea5 100644
+--- ortools/linear_solver/BUILD.bazel
++++ ortools/linear_solver/BUILD.bazel
+@@ -5,31 +5,6 @@ package(default_visibility = ["//visibility:public"])
+ 
+ exports_files(["model_exporter_swig_helper.h"])
+ 
+-config_setting(
+-    name = "with_glpk",
+-    values = {"define": "USE_GLPK="},
+-)
+-
+-config_setting(
+-    name = "with_cplex",
+-    values = {"define": "USE_CPLEX="},
+-)
+-
+-config_setting(
+-    name = "with_xpress",
+-    values = {"define": "USE_XPRESS="},
+-)
+-
+-config_setting(
+-    name = "with_cbc",
+-    values = {"define": "USE_CBC="},
+-)
+-
+-config_setting(
+-    name = "with_clp",
+-    values = {"define": "USE_CLP="},
+-)
+-
+ proto_library(
+     name = "linear_solver_proto",
+     srcs = ["linear_solver.proto"],
+@@ -41,12 +16,6 @@ cc_proto_library(
+     deps = [":linear_solver_proto"],
+ )
+ 
+-# You can include the interfaces to different solvers by invoking '--define'
+-# flags. By default GLOP, BOP, SCIP, GUROBI, and CP-SAT interface are included.
+-#
+-# For instance, if you want to use the GLPK solver, build with
+-# '--define USE_GLPK=' (or add it to your bazel.rc file). This will download,
+-# build and link to GLPK.
+ cc_library(
+     name = "linear_solver",
+     srcs = [
+@@ -68,22 +37,8 @@ cc_library(
+         "scip_callback.cc",
+         "scip_interface.cc",
+         "scip_proto_solver.cc",
+-    ] + select({
+-        ":with_cbc": ["cbc_interface.cc"],
+-        "//conditions:default": [],
+-    }) + select({
+-        ":with_clp": ["clp_interface.cc"],
+-        "//conditions:default": [],
+-    }) + select({
+-        ":with_cplex": ["cplex_interface.cc"],
+-        "//conditions:default": [],
+-    }) + select({
+-        ":with_xpress": ["xpress_interface.cc"],
+-        "//conditions:default": [],
+-    }) + select({
+-        ":with_glpk": ["glpk_interface.cc"],
+-        "//conditions:default": [],
+-    }),
++	"glpk_interface.cc",
++    ],
+     hdrs = [
+         "glop_interface.cc",
+         "glop_utils.h",
+@@ -101,7 +56,8 @@ cc_library(
+     ],
+     copts = [
+         "-DUSE_PDLP",
+         "-DUSE_SCIP",
++	     "-DUSE_GLOP",
+     ],
+     deps = [
+         ":linear_solver_cc_proto",
+@@ -136,10 +92,9 @@ cc_library(
+         "//ortools/sat:lp_utils",
+         "//ortools/util:fp_utils",
+         "//ortools/util:lazy_mutable_copy",
+-    ] + select({
+-        ":with_glpk": ["@glpk//:glpk"],
+-        "//conditions:default": [],
+-    }),
++	"@glpk//:glpk",
++   "//ortools/glpk:glpk_env_deleter",
++    ],
+ )
+ 
+ copy_file(

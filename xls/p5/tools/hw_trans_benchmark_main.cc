@@ -66,12 +66,15 @@ absl::Status RealMain(const std::string &benchmark_dir,
 
   for (auto &package : benchmark.packages()) {
     for (auto &func : package->functions()) {
+      std::cerr << "new func " << std::endl;
       for (SchedulingStrategy strategy :
-           {SchedulingStrategy::MINIMIZE_REGISTERS_INTEGER,
-            SchedulingStrategy::MINIMIZE_REGISTERS_SDC}) {
+           {SchedulingStrategy::MINIMIZE_REGISTERS_SDC,
+            SchedulingStrategy::MINIMIZE_REGISTERS}) {
         for (auto clk = 5; clk <= 10; ++clk) {
           SchedulingOptions options(strategy);
           options.clock_period_ps(clk);
+
+          std::cerr << "clk = " << clk << std::endl;
 
           XLS_ASSIGN_OR_RETURN(
               PipelineSchedule result,

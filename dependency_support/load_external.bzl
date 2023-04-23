@@ -18,6 +18,7 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("//dependency_support/boost:workspace.bzl", repo_boost = "repo")
 load("//dependency_support/llvm:workspace.bzl", repo_llvm = "repo")
 load("//dependency_support/rules_hdl:workspace.bzl", repo_rules_hdl = "repo")
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository", "new_git_repository")
 
 def load_external_repositories():
     """Loads external repositories with third-party code."""
@@ -207,9 +208,54 @@ def load_external_repositories():
         strip_prefix = "or-tools-525162feaadaeef640783b2eaea38cf4b623877f",
         # Removes undesired dependencies like Eigen, BLISS, SCIP
         patches = [
-            "@com_google_xls//dependency_support/com_google_ortools:remove_deps.diff",
-            "@com_google_xls//dependency_support/com_google_ortools:no-glpk.diff",
+            "@com_google_xls//dependency_support/com_google_ortools:rename_flags.diff",
+            #"@com_google_xls//dependency_support/com_google_ortools:with_glpk.diff",
         ],
+    )
+
+    http_archive(
+        name = "bliss",
+        build_file = "@com_google_xls//dependency_support/com_google_ortools:bliss.BUILD",
+        patches = ["@com_google_xls//dependency_support/com_google_ortools:bliss-0.73.patch"],
+        sha256 = "f57bf32804140cad58b1240b804e0dbd68f7e6bf67eba8e0c0fa3a62fd7f0f84",
+        url = "https://github.com/google/or-tools/releases/download/v9.0/bliss-0.73.zip",
+        #url = "http://www.tcs.hut.fi/Software/bliss/bliss-0.73.zip",
+    )
+
+    # Eigen has no Bazel build.
+    http_archive(
+        name = "eigen",
+        sha256 = "b4c198460eba6f28d34894e3a5710998818515104d6e74e5cc331ce31e46e626",
+        strip_prefix = "eigen-3.4.0",
+        urls = [
+            "https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.bz2",
+        ],
+        build_file_content =
+"""
+cc_library(
+    name = 'eigen3',
+    srcs = [],
+    includes = ['.'],
+    hdrs = glob(['Eigen/**']),
+    visibility = ['//visibility:public'],
+)
+"""
+    )
+
+    new_git_repository(
+        name = "scip",
+        build_file = "@com_google_xls//dependency_support/com_google_ortools:scip.BUILD",
+        patches = ["@com_google_xls//dependency_support/com_google_ortools:scip.patch"],
+        patch_args = ["-p1"],
+        tag = "v800",
+        remote = "https://github.com/scipopt/scip.git",
+    )
+
+    http_archive(
+        name = "glpk",
+        build_file = "@com_google_xls//dependency_support/com_google_ortools:glpk.BUILD",
+        sha256 = "4a1013eebb50f728fc601bdd833b0b2870333c3b3e5a816eeba921d95bec6f15",
+        url = "http://ftp.gnu.org/gnu/glpk/glpk-5.0.tar.gz",
     )
 
     http_archive(
