@@ -1126,13 +1126,18 @@ std::string SchedulerProfiler::DumpCSV() {
     }
   };
 
-  for (auto i = 0; i < func_.size(); ++i) {
-    result += absl::StrFormat(
-        "%lld,%lld,%s,%s,%s,%s,%lld,%lld,%lld\n", func2id_.at(func_.at(i)),
-        clk_.at(i), enum_to_str(strategy_.at(i)),
-        absl::FormatDuration(run_duration_.at(i)),
-        absl::FormatDuration(solve_mothod_duration_.at(i)),
-        absl::FormatDuration(solver_duration_.at(i)), var_num_.at(i),
+  auto duration_to_sec = [](absl::Duration d) -> double {
+    return absl::ToInt64Microseconds(absl::Trunc(d, absl::Microseconds(10))) /
+           1000000.0;
+  };
+
+  for (int i = 0; i < func_.size(); ++i) {
+    absl::StrAppendFormat(
+        &result, "%lld,%lld,%s,%lf,%lf,%lf,%lld,%lld,%lld\n",
+        func2id_.at(func_.at(i)), clk_.at(i), enum_to_str(strategy_.at(i)),
+        duration_to_sec(run_duration_.at(i)),
+        duration_to_sec(solve_mothod_duration_.at(i)),
+        duration_to_sec(solver_duration_.at(i)), var_num_.at(i),
         constraint_num_.at(i), quality_.at(i));
   }
 
