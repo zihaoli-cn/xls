@@ -208,7 +208,7 @@ def load_external_repositories():
         strip_prefix = "or-tools-525162feaadaeef640783b2eaea38cf4b623877f",
         # Removes undesired dependencies like Eigen, BLISS, SCIP
         patches = [
-            "@com_google_xls//dependency_support/com_google_ortools:rename_flags.diff",
+            "@com_google_xls//dependency_support/com_google_ortools:rename_flags_with_scip.diff",
             #"@com_google_xls//dependency_support/com_google_ortools:with_glpk.diff",
         ],
     )
