@@ -90,6 +90,7 @@ absl::Status RealMain(const std::string &benchmark_dir,
 
   std::ofstream fout;
   fout.open("xls/p5/data/scheduling/result.csv", std::ios::out);
+  XLS_CHECK(fout.is_open());
   fout << sched_profiler.DumpCSV() << std::endl;
   fout.close();
 
