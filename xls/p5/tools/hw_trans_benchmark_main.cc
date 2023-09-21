@@ -73,7 +73,7 @@ absl::Status RealMain(const std::string &benchmark_dir,
             SchedulingStrategy::MINIMIZE_REGISTERS_INTEGER,
             SchedulingStrategy::MINIMIZE_REGISTERS_SDC,
             SchedulingStrategy::MINIMIZE_REGISTERS}) {
-        for (auto clk = 5; clk <= 10; clk++) {
+        for (auto clk = 5; clk <= 15; clk++) {
           SchedulingOptions options(strategy);
           options.clock_period_ps(clk);
 
